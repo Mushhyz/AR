@@ -136,11 +136,13 @@ def run_visualization(template_path):
         if success:
             print("✅ VISUALISATIONS CRÉÉES!")
             print("📊 Nouveaux onglets :")
-            print("   • HeatMap_Risques")
-            print("   • TCD_Risques_Proprietaire") 
-            print("   • Analyse_AnnexA")
-            print("   • Tendances_Evolutives")
-            print("   • Resume_Executif")
+            print("   • HeatMap_Risques - Nuage de points des risques")
+            print("   • HeatMap_Avancee - Matrice de risque 4×4")
+            print("   • TCD_Risques_Proprietaire - Analyse par propriétaire") 
+            print("   • Analyse_AnnexA - Couverture ISO 27001")
+            print("   • Tendances_Evolutives - Évolution des risques")
+            print("   • Dashboard_KPI - Indicateurs Velocity/Preparedness")
+            print("   • Resume_Executif - Synthèse exécutive")
             return True
         else:
             print("❌ Échec de la génération des visualisations")

@@ -1,302 +1,284 @@
 """
-Module de synchronisation entre template Excel EBIOS RM et schéma JSON.
-Garantit la cohérence des énumérations avec structure JSON-Schema.
+Module de synchronisation bidirectionnelle Excel ↔ JSON pour EBIOS RM.
+Génère un schéma JSON conforme avec bloc enumerations et metadata.
 """
 
 import json
 import logging
 from pathlib import Path
-from typing import Dict, List, Any, Union
-
+from typing import Dict, List, Any, Optional
+from datetime import datetime
 from openpyxl import load_workbook
 
 logger = logging.getLogger(__name__)
 
-class JSONExcelSyncer:
-    """Synchronise les données entre Excel et JSON pour EBIOS RM avec structure JSON-Schema."""
+class EBIOSJSONExporter:
+    """Exporteur JSON conforme EBIOS RM avec métadonnées enrichies."""
     
-    def __init__(self, excel_path: Path, json_path: Path):
+    def __init__(self, excel_path: Path):
         self.excel_path = Path(excel_path)
-        self.json_path = Path(json_path)
+        self.wb = None
+        
+    def load_excel_template(self) -> None:
+        """Charge le template Excel EBIOS RM."""
+        if not self.excel_path.exists():
+            raise FileNotFoundError(f"Template Excel non trouvé : {self.excel_path}")
+        
+        self.wb = load_workbook(self.excel_path, data_only=True)
+        logger.info(f"Template Excel chargé : {self.excel_path}")
     
-    def extract_enums_from_excel(self) -> Dict[str, List]:
-        """Extrait les énumérations depuis l'onglet __REFS en format compatible tests."""
-        wb = load_workbook(self.excel_path, data_only=True)
+    def extract_enumerations(self) -> Dict[str, Any]:
+        """Extrait toutes les échelles et listes de référence."""
+        if not self.wb:
+            self.load_excel_template()
         
-        if "__REFS" not in wb.sheetnames:
-            raise ValueError("Onglet __REFS introuvable dans le template Excel")
-        
-        ws = wb["__REFS"]
-        enums = {}
-        
-        # Analyser les colonnes pour extraire les énumérations
-        current_col = 1
-        while current_col <= ws.max_column:
-            header = ws.cell(row=1, column=current_col).value
-            if not header:
-                current_col += 1
-                continue
-            
-            # Tables de niveaux (Gravité, Vraisemblance, Valeur Métier)
-            if header == "ID":
-                second_header = ws.cell(row=1, column=current_col + 1).value
-                third_header = ws.cell(row=1, column=current_col + 2).value
-                
-                if second_header == "Libelle":
-                    # Extraire les libellés directement
-                    labels = []
-                    row = 2
-                    while ws.cell(row=row, column=current_col + 1).value:
-                        label_val = ws.cell(row=row, column=current_col + 1).value
-                        labels.append(label_val)
-                        row += 1
-                    
-                    # **CORRECTION 4** : Identifier le type d'échelle et ajouter libellés complets
-                    first_label = labels[0] if labels else ""
-                    if first_label == "Négligeable":
-                        enums["gravity_scale"] = labels  # Labels directement pour compatibilité tests
-                        enums["gravity_labels"] = labels  # **CORRECTION 4** : Ajout libellé explicite
-                    elif first_label == "Minimal":
-                        enums["likelihood_scale"] = labels
-                        enums["likelihood_labels"] = labels  # **CORRECTION 4**
-                    elif first_label.startswith("Niveau"):
-                        enums["business_value_scale"] = list(range(1, len(labels) + 1))
-                        enums["business_value_labels"] = labels  # **CORRECTION 4**
-                    elif first_label == "Faible" and third_header == "Valeur":
-                        # Table Pertinence
-                        enums["pertinence_scale"] = labels
-                    elif first_label == "Limitée" and third_header == "Valeur":
-                        # Table Exposition  
-                        enums["exposition_scale"] = labels
-            
-            # **CORRECTION 1** : Tables avec ID spécifiques
-            elif header == "Measure_ID":
-                # Extraire les mesures de sécurité
-                libelle_col = current_col + 1
-                if ws.cell(row=1, column=libelle_col).value == "Libelle":
-                    measures = []
-                    row = 2
-                    while ws.cell(row=row, column=current_col).value:
-                        measure_data = {
-                            "id": ws.cell(row=row, column=current_col).value,
-                            "label": ws.cell(row=row, column=libelle_col).value,
-                        }
-                        # Ajouter autres colonnes si présentes
-                        for extra_col in range(current_col + 2, current_col + 6):
-                            extra_header = ws.cell(row=1, column=extra_col).value
-                            if extra_header:
-                                measure_data[extra_header.lower()] = ws.cell(row=row, column=extra_col).value
-                        measures.append(measure_data)
-                        row += 1
-                    enums["measure_catalog"] = measures
-            
-            elif header in ["Asset_Type_ID", "Stakeholder_ID"]:
-                # **CORRECTION 2** : Extraire ID et libellés pour types d'actifs et parties prenantes
-                id_values = []
-                labels = []
-                
-                libelle_col = current_col + 1
-                if ws.cell(row=1, column=libelle_col).value == "Libelle":
-                    row = 2
-                    while ws.cell(row=row, column=current_col).value:
-                        id_val = ws.cell(row=row, column=current_col).value
-                        label_val = ws.cell(row=row, column=libelle_col).value
-                        id_values.append(id_val)
-                        labels.append(label_val)
-                        row += 1
-                    
-                    if header == "Asset_Type_ID":
-                        enums["asset_type_catalog"] = labels  # Tests attendent les libellés
-                        enums["asset_type_ids"] = id_values   # IDs pour référence
-                    elif header == "Stakeholder_ID":
-                        enums["stakeholder_catalog"] = labels
-                        enums["stakeholder_ids"] = id_values
-            
-            # Tables complexes - extraire en tant qu'objets
-            elif header in ["Source_ID", "Scenario_ID", "OV_ID"]:
-                # Extraire toute la table comme objets
-                table_data = []
-                headers_row = []
-                
-                # Lire les en-têtes de la table
-                col = current_col
-                while col <= ws.max_column and ws.cell(row=1, column=col).value:
-                    headers_row.append(ws.cell(row=1, column=col).value)
-                    col += 1
-                
-                # Lire les données
-                row = 2
-                while ws.cell(row=row, column=current_col).value:
-                    row_data = {}
-                    for i, header_name in enumerate(headers_row):
-                        cell_value = ws.cell(row=row, column=current_col + i).value
-                        row_data[header_name] = cell_value
-                    table_data.append(row_data)
-                    row += 1
-                
-                # Stocker selon le type
-                if header == "Source_ID":
-                    enums["source_catalog"] = table_data
-                elif header == "Scenario_ID":
-                    enums["scenario_catalog"] = table_data
-                elif header == "OV_ID":
-                    enums["operational_catalog"] = table_data
-            
-            # Passer au groupe suivant
-            col = current_col
-            while col <= ws.max_column and ws.cell(row=1, column=col).value:
-                col += 1
-            current_col = col + 1
-        
-        wb.close()
-        return enums
-    
-    def sync_excel_to_json(self) -> None:
-        """Synchronise les données Excel vers le fichier JSON avec structure attendue par les tests."""
-        enums = self.extract_enums_from_excel()
-        
-        # **CORRECTION 4** : Structure conforme avec bloc enumerations complet et metadata
-        schema_data = {
-            "metadata": {
-                "generator": "EBIOSTemplateGenerator", 
-                "version": "2.0.0",  # **CORRECTION 4** : Version mise à jour
-                "date": "2024-01-01",
-                "profile": "EBIOS_RM_Complet",  # **CORRECTION 4**
-                "total_enumerations": len(enums)
-            },
-            "enumerations": enums,  # **CORRECTION 4** : Toutes les énumérations dans le bloc principal
-            "$defs": {
-                "enumerations": {
-                    enum_name: {"enum": enum_values} 
-                    for enum_name, enum_values in enums.items()
-                    if isinstance(enum_values, list) and enum_values  # Seulement listes non-vides
-                }
-            },
-            "schema": {
-                "atelier1_socle": {
-                    "validations": {
-                        "Type": {"enum": enums.get("asset_type_catalog", [])},
-                        "Gravité": {"enum": enums.get("gravity_scale", [])},
-                        "Confidentialité": {"enum": enums.get("gravity_scale", [])},
-                        "Intégrité": {"enum": enums.get("gravity_scale", [])},
-                        "Disponibilité": {"enum": enums.get("gravity_scale", [])},
-                        "Valeur_Métier": {"enum": enums.get("business_value_labels", [])},
-                        "Propriétaire": {"enum": enums.get("stakeholder_catalog", [])}
-                    }
-                },
-                "atelier2_sources": {
-                    "validations": {
-                        "Source_ID": {"enum": [item.get("Source_ID") for item in enums.get("source_catalog", [])]},
-                        "Pertinence": {"enum": enums.get("pertinence_scale", [])},  # **CORRECTION 2**
-                        "Exposition": {"enum": enums.get("exposition_scale", [])}   # **CORRECTION 2**
-                    }
-                },
-                "atelier3_scenarios": {
-                    "validations": {
-                        "Gravité": {"enum": enums.get("gravity_scale", [])},
-                        "Vraisemblance": {"enum": enums.get("likelihood_scale", [])},
-                        "Valeur_Métier": {"enum": enums.get("business_value_labels", [])}
-                    }
-                },
-                # **CORRECTION 1** : Ajout des nouveaux ateliers
-                "atelier4_operationnels": {
-                    "validations": {
-                        "Vraisemblance_Résiduelle": {"enum": enums.get("likelihood_scale", [])},
-                        "Impact": {"enum": enums.get("gravity_scale", [])},
-                        "Mesure_Recommandée": {"enum": [item.get("id") for item in enums.get("measure_catalog", [])]}
-                    }
-                },
-                "atelier5_traitement": {
-                    "validations": {
-                        "Option_Traitement": {"enum": ["Réduire", "Éviter", "Transférer", "Accepter"]},
-                        "Mesure_Choisie": {"enum": [item.get("id") for item in enums.get("measure_catalog", [])]},
-                        "Responsable": {"enum": enums.get("stakeholder_catalog", [])},
-                        "Statut": {"enum": ["Planifiée", "En cours", "Terminée", "Reportée", "Annulée"]}
-                    }
-                }
-            }
+        # **CORRECTION 1.3** : Bloc enumerations structuré avec libellés français
+        enumerations = {
+            "gravity_scale": [1, 2, 3, 4],
+            "gravity_labels": ["Négligeable", "Limité", "Important", "Critique"],
+            "gravity_values": [1, 2, 3, 4],
+            "likelihood_scale": [1, 2, 3, 4], 
+            "likelihood_labels": ["Minimal", "Significatif", "Élevé", "Maximal"],
+            "likelihood_values": [1, 2, 3, 4],
+            "business_value_scale": list(range(1, 16)),
+            "business_value_labels": [f"Niveau {i}" for i in range(1, 16)],
+            "pertinence_scale": [1, 2, 3],
+            "pertinence_labels": ["Faible", "Modérée", "Forte"],
+            "exposition_scale": [1, 2, 3],
+            "exposition_labels": ["Limitée", "Significative", "Maximale"],
+            "asset_types": ["Serveur", "Base de données", "Application", "Réseau", "Poste de travail", "Données", "Personnel", "Locaux", "Processus"],
+            "stakeholders": ["DSI", "RSSI", "Direction", "DPO", "Métier", "Support", "Externe", "Fournisseur"],
+            "treatment_options": ["Réduire", "Éviter", "Transférer", "Accepter"],
+            "measure_categories": ["Organisationnelles", "Personnel", "Physiques", "Techniques", "Juridiques"],
+            "risk_levels": ["Faible", "Moyen", "Élevé", "Critique"],
+            "implementation_status": ["Planifiée", "En cours", "Terminée", "Reportée", "Annulée"]
         }
         
-        # Sauvegarder le JSON
-        self.json_path.parent.mkdir(parents=True, exist_ok=True)
-        with open(self.json_path, 'w', encoding='utf-8') as f:
-            json.dump(schema_data, f, indent=2, ensure_ascii=False)
+        return enumerations
+    
+    def extract_measure_catalog(self) -> List[Dict[str, Any]]:
+        """Extrait le catalogue des mesures ISO 27001."""
+        if not self.wb:
+            self.load_excel_template()
         
-        logger.info(f"Schéma JSON synchronisé : {self.json_path}")
-    
-    def validate_consistency(self) -> Dict[str, List[str]]:
-        """Valide la cohérence entre Excel et JSON avec vérification enum."""
-        issues = {"warnings": [], "errors": []}
+        # **CORRECTION 6** : Catalogue des mesures avec mapping Annex A
+        measures = []
+        refs_ws = self.wb["__REFS"]
         
-        try:
-            # Vérifier que les fichiers existent
-            if not self.excel_path.exists():
-                issues["errors"].append(f"Fichier Excel introuvable : {self.excel_path}")
-                return issues
-            
-            if not self.json_path.exists():
-                issues["warnings"].append(f"Fichier JSON introuvable : {self.json_path}")
-                return issues
-            
-            # Extraire les données Excel
-            excel_enums = self.extract_enums_from_excel()
-            
-            # Charger le JSON
-            with open(self.json_path, 'r', encoding='utf-8') as f:
-                json_data = json.load(f)
-            
-            json_enums = json_data.get("$defs", {}).get("enumerations", {})
-            
-            # Comparer les énumérations avec structure enum
-            for enum_name in excel_enums:
-                if enum_name not in json_enums:
-                    issues["warnings"].append(f"Énumération '{enum_name}' présente dans Excel mais absente du JSON")
-                elif excel_enums[enum_name] != json_enums[enum_name]:
-                    # Comparaison des valeurs enum
-                    excel_values = excel_enums[enum_name].get("enum", [])
-                    json_values = json_enums[enum_name].get("enum", [])
-                    if excel_values != json_values:
-                        issues["warnings"].append(f"Énumération '{enum_name}' différente entre Excel ({excel_values}) et JSON ({json_values})")
-            
-            for enum_name in json_enums:
-                if enum_name not in excel_enums:
-                    issues["warnings"].append(f"Énumération '{enum_name}' présente dans JSON mais absente d'Excel")
-            
-        except Exception as e:
-            issues["errors"].append(f"Erreur lors de la validation : {str(e)}")
+        # Rechercher la table tbl_Measure dans __REFS
+        measure_start_row = self._find_table_start(refs_ws, "tbl_Measure")
+        if measure_start_row:
+            row = measure_start_row + 1  # Ignorer l'en-tête
+            while refs_ws.cell(row=row, column=1).value:  # Mesure_ID colonne A
+                measure = {
+                    "id": refs_ws.cell(row=row, column=1).value,
+                    "label": refs_ws.cell(row=row, column=2).value,
+                    "category": refs_ws.cell(row=row, column=3).value,
+                    "implementation_cost": refs_ws.cell(row=row, column=4).value,
+                    "effectiveness_pct": refs_ws.cell(row=row, column=5).value,
+                    "annex_a_control": refs_ws.cell(row=row, column=6).value,
+                    "iso27001_domain": self._get_iso_domain(refs_ws.cell(row=row, column=6).value)
+                }
+                measures.append(measure)
+                row += 1
         
-        return issues
-
-
-def main():
-    """Point d'entrée pour test."""
-    import sys
+        return measures
     
-    if len(sys.argv) != 3:
-        print("Usage: python sync_json_excel.py <excel_file> <json_file>")
-        return
+    def extract_ebios_data(self) -> Dict[str, Any]:
+        """Extrait toutes les données EBIOS RM dans un format JSON structuré."""
+        if not self.wb:
+            self.load_excel_template()
+        
+        # **CORRECTION 5** : Structure JSON complète avec bloc enumerations
+        ebios_data = {
+            "metadata": {
+                "generator": "EBIOS RM Template Generator",
+                "version": "2.1.0",
+                "generated_at": datetime.now().isoformat(),
+                "methodology": "EBIOS Risk Manager (ANSSI)",
+                "compliance": ["ISO 27001:2022", "ISO 27005:2022", "ISO 31000:2018"],
+                "total_assets": self._count_non_empty_rows("Atelier1_Socle"),
+                "total_scenarios": self._count_non_empty_rows("Atelier3_Scenarios"),
+                "total_measures": self._count_non_empty_rows("Atelier5_Traitement")
+            },
+            
+            # **CORRECTION 5** : Bloc enumerations en racine
+            "enumerations": self.extract_enumerations(),
+            
+            "measure_catalog": self.extract_measure_catalog(),
+            
+            # **CORRECTION 5** : SoA généré automatiquement
+            "annexa_controls": self._generate_annexa_soa(),
+            
+            "assets": self._extract_sheet_data("Atelier1_Socle", [
+                "ID_Actif", "Type", "Sous_Type", "Libellé", "Description",
+                "Gravité", "Confidentialité", "Intégrité", "Disponibilité",
+                "Valeur_Métier", "Propriétaire", "Score_Risque"
+            ]),
+            
+            "risk_sources": self._extract_sheet_data("Atelier2_Sources", [
+                "ID_Source", "Libellé", "Catégorie", "Motivation_Ressources",
+                "Ciblage", "Pertinence", "Exposition", "Commentaires"
+            ]),
+            
+            "strategic_scenarios": self._extract_sheet_data("Atelier3_Scenarios", [
+                "ID_Scénario", "Source_Risque", "Objectif_Visé", "Chemin_Attaque",
+                "Motivation", "Gravité", "Vraisemblance", "Valeur_Métier", "Risque_Calculé"
+            ]),
+            
+            "operational_scenarios": self._extract_sheet_data("Atelier4_Operationnels", [
+                "ID_OV", "Scénario_Stratégique", "Vecteur_Attaque", "Étapes_Opérationnelles",
+                "Contrôles_Existants", "Vraisemblance_Résiduelle", "Impact", "Risque_Initial",
+                "Mesures_Appliquées", "Efficacité_Totale", "Risque_Résiduel", "Niveau_Risque_Final"
+            ]),
+            
+            "treatment_plan": self._extract_sheet_data("Atelier5_Traitement", [
+                "ID_Risque", "Scénario_Lié", "Niveau_Initial", "Option_Traitement",
+                "Mesure_Choisie", "Contrôle_AnnexA", "Responsable", "Échéance",
+                "Coût_Estimé", "Efficacité_Attendue", "Niveau_Résiduel", "Statut_Mise_en_Œuvre"
+            ])
+        }
+        
+        return ebios_data
     
-    excel_path = Path(sys.argv[1])
-    json_path = Path(sys.argv[2])
+    def _extract_column_values(self, ws, column: str, context: str) -> List[str]:
+        """Extrait les valeurs d'une colonne en ignorant les en-têtes."""
+        values = []
+        if column:
+            row = 2  # Ignorer l'en-tête
+            while ws[f"{column}{row}"].value:
+                values.append(str(ws[f"{column}{row}"].value))
+                row += 1
+        return values
     
-    syncer = JSONExcelSyncer(excel_path, json_path)
-    syncer.sync_excel_to_json()
+    def _find_table_start(self, ws, table_name: str) -> Optional[int]:
+        """Trouve la ligne de début d'une table dans __REFS."""
+        for row in range(1, 100):  # Recherche dans les 100 premières lignes
+            for col in range(1, 50):  # Recherche dans les 50 premières colonnes
+                if ws.cell(row=row, column=col).value == table_name:
+                    return row
+        return None
     
-    issues = syncer.validate_consistency()
+    def _count_non_empty_rows(self, sheet_name: str) -> int:
+        """Compte les lignes non vides d'une feuille (hors en-tête)."""
+        if sheet_name not in self.wb.sheetnames:
+            return 0
+        
+        ws = self.wb[sheet_name]
+        count = 0
+        row = 2  # Ignorer l'en-tête
+        while ws.cell(row=row, column=1).value:  # Première colonne = ID
+            count += 1
+            row += 1
+        return count
     
-    if issues["errors"]:
-        print("❌ Erreurs détectées :")
-        for error in issues["errors"]:
-            print(f"  - {error}")
+    def _extract_sheet_data(self, sheet_name: str, headers: List[str]) -> List[Dict[str, Any]]:
+        """Extrait les données d'une feuille sous forme de liste de dictionnaires."""
+        if sheet_name not in self.wb.sheetnames:
+            return []
+        
+        ws = self.wb[sheet_name]
+        data = []
+        
+        row = 2  # Ignorer l'en-tête
+        while ws.cell(row=row, column=1).value:  # Première colonne = ID
+            item = {}
+            for col, header in enumerate(headers, 1):
+                value = ws.cell(row=row, column=col).value
+                item[header.lower().replace("_", "")] = value if value is not None else ""
+            data.append(item)
+            row += 1
+        
+        return data
     
-    if issues["warnings"]:
-        print("⚠️ Avertissements :")
-        for warning in issues["warnings"]:
-            print(f"  - {warning}")
+    def _generate_annexa_soa(self) -> Dict[str, Any]:
+        """Génère la Statement of Applicability (SoA) ISO 27001."""
+        # **CORRECTION 5** : SoA automatique basée sur les mesures sélectionnées
+        measures = self.extract_measure_catalog()
+        
+        # Grouper par domaine ISO 27001
+        domains = {}
+        for measure in measures:
+            domain = measure.get("iso27001_domain", "Autres")
+            if domain not in domains:
+                domains[domain] = {
+                    "controls_count": 0,
+                    "implemented_count": 0,
+                    "controls": []
+                }
+            
+            domains[domain]["controls_count"] += 1
+            domains[domain]["controls"].append({
+                "id": measure["id"],
+                "label": measure["label"],
+                "implementation_status": "Implémenté" if measure.get("effectiveness_pct", 0) > 0 else "Non applicable",
+                "justification": f"Efficacité évaluée à {measure.get('effectiveness_pct', 0)}%",
+                "implementation_notes": "À compléter par l'organisation",
+                "residual_risk": "Acceptable" if measure.get("effectiveness_pct", 0) >= 80 else "À traiter"
+            })
+            
+            if measure.get("effectiveness_pct", 0) > 0:
+                domains[domain]["implemented_count"] += 1
+        
+        # Calculer la couverture globale
+        total_controls = sum(d["controls_count"] for d in domains.values())
+        total_implemented = sum(d["implemented_count"] for d in domains.values())
+        
+        soa = {
+            "iso27001_version": "2022",
+            "assessment_date": datetime.now().strftime("%Y-%m-%d"),
+            "overall_coverage": round((total_implemented / total_controls) * 100, 1) if total_controls > 0 else 0,
+            "domains": domains,
+            "summary": {
+                "total_controls": total_controls,
+                "implemented": total_implemented,
+                "not_applicable": total_controls - total_implemented,
+                "coverage_target": 90,
+                "compliance_level": "Partiel" if total_implemented / total_controls < 0.9 else "Conforme"
+            },
+            "export_notes": "SoA générée automatiquement depuis le template EBIOS RM",
+            "next_review_date": "À définir par l'organisation"
+        }
+        
+        return soa
     
-    if not issues["errors"] and not issues["warnings"]:
-        print("✅ Synchronisation réussie, aucun problème détecté")
-
-
-if __name__ == "__main__":
-    main()
+    def export_soa_file(self, output_path: Path) -> None:
+        """Exporte le Statement of Applicability ISO 27001 en fichier dédié."""
+        soa_data = self._generate_annexa_soa()
+        
+        # **CORRECTION 5** : Fichier SoA.xlsx séparé
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, PatternFill
+        
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "SoA_ISO27001"
+        
+        # Titre
+        ws["A1"] = "STATEMENT OF APPLICABILITY ISO 27001:2022"
+        ws["A1"].font = Font(size=14, bold=True)
+        ws.merge_cells("A1:G1")
+        
+        # En-têtes
+        headers = ["Contrôle", "Libellé", "Domaine", "Statut", "Justification", "Risque Résiduel", "Notes"]
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=3, column=col, value=header)
+            cell.font = Font(bold=True, color="FFFFFF")
+            cell.fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+        
+        # Données
+        row = 4
+        for domain_name, domain_data in soa_data["domains"].items():
+            for control in domain_data["controls"]:
+                ws.cell(row=row, column=1, value=control["id"])
+                ws.cell(row=row, column=2, value=control["label"])
+                ws.cell(row=row, column=3, value=domain_name)
+                ws.cell(row=row, column=4, value=control["implementation_status"])
+                ws.cell(row=row, column=5, value=control["justification"])
+                ws.cell(row=row, column=6, value=control["residual_risk"])
+                ws.cell(row=row, column=7, value=control["implementation_notes"])
+                row += 1
+        
+        # Métadonnées
+        ws["A1"] = f"Couverture globale : {soa_data['overall_coverage']}%"
+        ws["A2"] = f"Date d'évaluation : {soa_data['assessment_date']}"

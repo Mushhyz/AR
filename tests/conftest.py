@@ -1,3 +1,82 @@
+"""Configuration pytest pour les tests EBIOS RM."""
+
+import pytest
+import tempfile
+import shutil
+from pathlib import Path
+
+
+@pytest.fixture(scope="session")
+def test_config_dir():
+    """Crée un répertoire de configuration temporaire pour les tests."""
+    temp_dir = Path(tempfile.mkdtemp())
+
+    # Créer des fichiers CSV de test
+    assets_csv = temp_dir / "assets.csv"
+    assets_csv.write_text(
+        """id,type,label,criticality
+    A001,Data,Customer Database,Critical
+    A002,System,Web Server,High
+    A003,Application,Mobile App,Medium
+    """,
+        encoding="utf-8",
+    )
+
+    threats_csv = temp_dir / "threats.csv"
+    threats_csv.write_text(
+        """sr_id,ov_id,strategic_path,operational_steps
+    SR001,OV001,External Attack,Step1:High,Step2:Medium
+    SR002,OV002,Internal Fraud,Step1:Low,Step2:High,Step3:Medium
+    """,
+        encoding="utf-8",
+    )
+
+    settings_yaml = temp_dir / "settings.yaml"
+    settings_yaml.write_text(
+        """excel_template: templates/ebiosrm_empty.xlsx
+    severity_scale: [Low, Medium, High, Critical]
+    likelihood_scale: [One-shot, Occasional, Probable, Systematic]
+    output_dir: build/
+    """,
+        encoding="utf-8",
+    )
+
+    yield temp_dir
+
+    # Cleanup
+    shutil.rmtree(temp_dir)
+
+
+@pytest.fixture
+def clean_output_dir(tmp_path):
+    """Crée un répertoire de sortie propre pour chaque test."""
+    output_dir = tmp_path / "output"
+    output_dir.mkdir(exist_ok=True)
+    return output_dir
+
+
+@pytest.fixture
+def sample_template_path(tmp_path):
+    """Crée un template Excel minimal pour les tests."""
+    try:
+        from scripts.generate_template import EBIOSTemplateGenerator
+
+        template_file = tmp_path / "sample_template.xlsx"
+        generator = EBIOSTemplateGenerator()
+        generator.generate_template(template_file)
+        return template_file
+    except ImportError:
+        pytest.skip("Generator non disponible pour ce test")
+
+
+@pytest.fixture(autouse=True)
+def configure_logging():
+    """Configure le logging pour les tests."""
+    import logging
+
+    logging.basicConfig(level=logging.WARNING)  # Réduire le bruit pendant les tests
+
+
 """Test configuration and shared fixtures."""
 
 from __future__ import annotations
@@ -870,14 +949,15 @@ def excel_template_validator():
         try:
             wb = load_workbook(workbook_path)
 
-            # Check expected worksheets
+            # **CORRECTION** : Noms d'onglets conformes au générateur
             expected_sheets = [
-                "Atelier 1 - Socle",
-                "Atelier 2 - Sources de risque",
-                "Atelier 3 - Scénarios stratégiques",
-                "Atelier 4 - Scénarios opérationnels",
-                "Atelier 5 - Traitement du risque",
-                "Synthèse",
+                "Config_EBIOS",
+                "Atelier1_Socle", 
+                "Atelier2_Sources", 
+                "Atelier3_Scenarios",
+                "Atelier4_Operationnels", 
+                "Atelier5_Traitement", 
+                "Synthese"
             ]
 
             missing_sheets = [
@@ -889,27 +969,20 @@ def excel_template_validator():
                     f"Missing sheets: {missing_sheets}"
                 )
 
-            # Check for hidden configuration sheets
-            config_sheets = [
-                sheet for sheet in wb.sheetnames if sheet.startswith("Config_")
-            ]
-            hidden_config_sheets = [
-                sheet
-                for sheet in config_sheets
-                if wb[sheet].sheet_state in ["hidden", "veryHidden"]
-            ]
-
-            if len(config_sheets) != len(hidden_config_sheets):
+            # **CORRECTION** : Vérifier l'onglet de références caché
+            if "__REFS" not in wb.sheetnames:
                 validation_results["hidden_sheets"]["valid"] = False
                 validation_results["hidden_sheets"]["issues"].append(
-                    "Some config sheets are not hidden"
+                    "Reference sheet __REFS not found"
+                )
+            elif wb["__REFS"].sheet_state != "veryHidden":
+                validation_results["hidden_sheets"]["valid"] = False
+                validation_results["hidden_sheets"]["issues"].append(
+                    "Reference sheet __REFS is not hidden"
                 )
 
-            # Check data validation on key sheets
-            for sheet_name in [
-                "Atelier 1 - Socle",
-                "Atelier 3 - Scénarios stratégiques",
-            ]:
+            # **CORRECTION** : Vérifier les validations sur les feuilles clés
+            for sheet_name in ["Atelier3_Scenarios", "Atelier4_Operationnels"]:
                 if sheet_name in wb.sheetnames:
                     ws = wb[sheet_name]
                     if (
@@ -920,6 +993,19 @@ def excel_template_validator():
                         validation_results["data_validation"]["issues"].append(
                             f"No data validation found in {sheet_name}"
                         )
+                    else:
+                        # Vérifier que les validations ont showDropDown=False
+                        dropdown_validation_found = False
+                        for dv in ws.data_validations.dataValidation:
+                            if dv.showDropDown == False:
+                                dropdown_validation_found = True
+                                break
+                        
+                        if not dropdown_validation_found:
+                            validation_results["data_validation"]["valid"] = False
+                            validation_results["data_validation"]["issues"].append(
+                                f"No dropdown validation with showDropDown=False in {sheet_name}"
+                            )
 
         except Exception as e:
             validation_results["structure"]["valid"] = False

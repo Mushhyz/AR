@@ -87,6 +87,68 @@ def test_full_generation():
         traceback.print_exc()
         return False
 
+def test_no_removed_records():
+    """Test pour s'assurer qu'aucune formule ne sera supprimée par Excel."""
+    print("🧪 Test de détection des formules qui causent 'Removed Records'...")
+    
+    try:
+        from openpyxl import load_workbook
+        
+        test_path = Path("c:/Users/mushm/Documents/AR/templates/ebios_risk_assessment_FR.xlsx")
+        
+        if not test_path.exists():
+            print("❌ Template non trouvé pour le test")
+            return False
+        
+        print("🔍 Chargement et analyse du template...")
+        wb = load_workbook(test_path, data_only=False)
+        
+        # Tables qui doivent exister pour les formules
+        required_tables = ["Incidents"]
+        missing_tables = []
+        
+        for table_name in required_tables:
+            if table_name not in wb.sheetnames:
+                missing_tables.append(table_name)
+        
+        if missing_tables:
+            print(f"❌ Tables manquantes: {missing_tables}")
+            return False
+        
+        # Vérifier les formules dangereuses
+        dangerous_formulas = []
+        critical_sheets = ["Synthese", "Dashboard_KPI", "Tendances_Evolutives"]
+        
+        for sheet_name in critical_sheets:
+            if sheet_name in wb.sheetnames:
+                ws = wb[sheet_name]
+                
+                for row in ws.iter_rows():
+                    for cell in row:
+                        if cell.value and isinstance(cell.value, str) and cell.value.startswith('='):
+                            # Rechercher les références à des tables inexistantes
+                            if any(ref in cell.value for ref in ["Personnel[", "Maturite["]):
+                                dangerous_formulas.append({
+                                    "sheet": sheet_name,
+                                    "cell": cell.coordinate,
+                                    "formula": cell.value[:50] + "..."
+                                })
+        
+        if dangerous_formulas:
+            print(f"⚠️ {len(dangerous_formulas)} formule(s) potentiellement dangereuse(s):")
+            for formula in dangerous_formulas[:3]:  # Afficher les 3 premières
+                print(f"   {formula['sheet']}.{formula['cell']}: {formula['formula']}")
+            print("💡 Ces formules pourraient être supprimées par Excel lors de l'ouverture")
+            return False
+        
+        print("✅ Aucune formule dangereuse détectée")
+        wb.close()
+        return True
+        
+    except Exception as e:
+        print(f"❌ Erreur lors du test : {e}")
+        return False
+
 def main():
     """Exécute tous les tests de diagnostic."""
     print("🔍 DIAGNOSTIC EBIOS RM GENERATOR")
@@ -96,6 +158,7 @@ def main():
         ("Test basique OpenPyXL", test_basic_generation),
         ("Test import générateur", test_import_generator),
         ("Test génération complète", test_full_generation),
+        ("Test formules sans 'Removed Records'", test_no_removed_records),
     ]
     
     results = []
@@ -124,9 +187,9 @@ def main():
     
     if total_success == len(results):
         print("🎉 Tous les tests sont réussis!")
-        print("💡 Vous pouvez maintenant utiliser generate_template.py")
+        print("💡 Le template ne devrait plus afficher de message 'Removed Records'")
     else:
-        print("⚠️  Certains tests ont échoué")
+        print("⚠️ Certains tests ont échoué")
         print("💡 Vérifiez les erreurs ci-dessus")
 
 if __name__ == "__main__":
