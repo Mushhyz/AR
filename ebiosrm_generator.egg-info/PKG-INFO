@@ -89,15 +89,108 @@ output_dir: build/
 
 ## 🧪 Tests
 
+### Tests unitaires
 ```bash
 # Exécuter tous les tests
 pytest
 
-# Avec couverture
+# Tests avec sortie détaillée
+pytest -v
+
+# Tester un fichier spécifique
+pytest tests/test_loader.py
+
+# Tester une fonction spécifique
+pytest tests/test_loader.py::test_load_assets
+
+# Arrêter au premier échec
+pytest -x
+```
+
+### Couverture de code
+```bash
+# Tests avec rapport de couverture
 pytest --cov=ebiosrm_core
 
-# Linting
+# Rapport de couverture en HTML
+pytest --cov=ebiosrm_core --cov-report=html
+
+# Couverture avec détails des lignes manquantes
+pytest --cov=ebiosrm_core --cov-report=term-missing
+```
+
+### Validation des données
+```bash
+# Vérifier la cohérence des CSV/YAML
+ebiosrm validate --cfg ./config
+
+# Validation avec diagnostic détaillé
+python debug_threats.py
+
+# Tester le chargement des assets
+python -c "from ebiosrm_core.loader import load_assets; print(load_assets('config/assets.csv'))"
+
+# Tester le chargement des threats
+python -c "from ebiosrm_core.loader import load_threats; print(load_threats('config/threats.csv'))"
+```
+
+### Qualité du code
+```bash
+# Linting avec ruff
 ruff check .
+
+# Formatage automatique
+ruff format .
+
+# Vérification du typage (si mypy installé)
+mypy ebiosrm_core/
+
+# Vérification de sécurité (si bandit installé)
+bandit -r ebiosrm_core/
+```
+
+### Tests d'intégration
+```bash
+# Test complet de génération
+ebiosrm export --cfg ./config --out ./test_output --fmt xlsx
+
+# Vérifier que les fichiers sont générés
+ls -la test_output/
+
+# Test avec différents formats
+ebiosrm export --fmt json
+ebiosrm export --fmt xlsx
+```
+
+### Tests de performance
+```bash
+# Test avec profiling (si cProfile disponible)
+python -m cProfile -o profile.stats cli.py export
+
+# Analyser le profil
+python -c "import pstats; p = pstats.Stats('profile.stats'); p.sort_stats('cumulative').print_stats(10)"
+```
+
+### Commandes de débogage
+```bash
+# Mode debug avec logs détaillés
+python -c "import logging; logging.basicConfig(level=logging.DEBUG); from ebiosrm_core.cli import main; main()"
+
+# Vérifier la structure des données chargées
+python -c "
+from ebiosrm_core.loader import load_all_data
+assets, threats, settings = load_all_data('config')
+print(f'Assets: {len(assets)}, Threats: {len(threats)}')
+print('Premier asset:', assets[0] if assets else 'Aucun')
+"
+
+# Test de la logique de calcul
+python -c "
+from ebiosrm_core.generator import EbiosRmGenerator
+gen = EbiosRmGenerator('config')
+risks = gen.generate_risks()
+print(f'Risques générés: {len(risks)}')
+"
 ```
 
 ## 🐛 Dépannage

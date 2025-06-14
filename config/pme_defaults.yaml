@@ -1,0 +1,36 @@
+# Configuration simplifiée EBIOS RM pour PME/TPE
+
+scope:
+  mission: "Fourniture de services numériques aux clients"
+  perimeter: "Système d'information principal"
+  baseline_level: "Standard"
+  
+simplified_scales:
+  impact_levels: ["Négligeable", "Limité", "Important", "Critique"]
+  likelihood_levels: ["Minimal", "Significatif", "Élevé", "Maximal"]
+  
+asset_categories:
+  - "Données clients"
+  - "Systèmes informatiques"
+  - "Locaux et équipements"
+  - "Personnel clé"
+
+threat_categories:
+  - "Cybercriminalité"
+  - "Espionnage industriel"
+  - "Sabotage/Vandalisme"
+  - "Erreurs humaines"
+
+measures_framework:
+  organizational: ["Politiques", "Procédures", "Formation"]
+  technical: ["Antivirus", "Firewall", "Sauvegarde"]
+  physical: ["Contrôle d'accès", "Vidéosurveillance"]
+  
+risk_matrix:
+  thresholds:
+    acceptable: 4
+    attention: 8
+    critical: 12
+
+# Référentiels simplifiés PME
+referentiels: ["ISO 27001 simplifié", "Guide ANSSI PME", "NIST cybersecurity framework"]

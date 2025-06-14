@@ -1,0 +1,5 @@
+id,label,category,description,criticality,xref_iso,xref_nist,version
+GDPR001,Pseudonymisation and encryption,Technical Measures,Pseudonymisation and encryption of personal data,Critical,ISO27001-10.1,NIST-PR.DS-1,2023-12-01
+GDPR002,Confidentiality and integrity,Data Protection,Ensure ongoing confidentiality and integrity of processing systems,Critical,ISO27001-10.1,NIST-PR.DS-6,2023-12-01
+GDPR003,Availability and resilience,Business Continuity,Ensure availability and resilience of processing systems and services,High,ISO27001-17.1,NIST-RC.RP-1,2023-12-01
+GDPR004,Recovery procedures,Incident Response,Ability to restore availability and access to personal data in timely manner,High,ISO27001-16.1,NIST-RC.RP-4,2023-12-01

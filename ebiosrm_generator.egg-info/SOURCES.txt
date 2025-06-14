@@ -12,4 +12,5 @@ ebiosrm_generator.egg-info/dependency_links.txt
 ebiosrm_generator.egg-info/entry_points.txt
 ebiosrm_generator.egg-info/requires.txt
 ebiosrm_generator.egg-info/top_level.txt
+tests/test_ebios_features.py
 tests/test_full_flow.py

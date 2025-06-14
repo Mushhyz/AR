@@ -1,0 +1,26 @@
+id,label,category,description,criticality,xref_iso,xref_nist,version
+PCI001,Firewall configuration,Network Security,Install and maintain network security controls,Critical,ISO27001-13.1,NIST-PR.AC-4,2024-03-30
+PCI002,Default passwords,Authentication,Do not use vendor-supplied defaults for security parameters,High,ISO27001-9.4,NIST-PR.AC-1,2024-03-30
+PCI003,Cardholder data protection,Data Protection,Protect stored cardholder data,Critical,ISO27001-10.1,NIST-PR.DS-1,2024-03-30
+PCI004,Transmission encryption,Encryption,Protect cardholder data with strong cryptography during transmission,Critical,ISO27001-13.1,NIST-PR.DS-2,2024-03-30
+PCI005,Anti-malware,Malware Protection,Protect all systems and networks from malicious software,High,ISO27001-12.2,NIST-PR.DS-8,2024-03-30
+PCI006,Secure systems,System Security,Develop and maintain secure systems and software,High,ISO27001-14.2,NIST-PR.IP-1,2024-03-30
+PCI007,Access control,Access Management,Restrict access to cardholder data by business need to know,Critical,ISO27001-9.1,NIST-PR.AC-3,2024-03-30
+PCI008,Unique IDs,Identity Management,Identify users and authenticate access to system components,High,ISO27001-9.2,NIST-PR.AC-1,2024-03-30
+PCI009,Physical access,Physical Security,Restrict physical access to cardholder data,High,ISO27001-11.1,NIST-PR.AC-2,2024-03-30
+PCI010,Network monitoring,Monitoring,Track and monitor all access to network resources and cardholder data,High,ISO27001-12.4,NIST-DE.CM-1,2024-03-30
+PCI011,Security testing,Testing,Regularly test security systems and processes,Medium,ISO27001-14.2,NIST-DE.DP-5,2024-03-30
+PCI012,Information security policy,Policy,Maintain a policy that addresses information security,Medium,ISO27001-5.2,NIST-ID.GV-1,2024-03-30
+PCI013,Multi-factor authentication,Authentication,Use multi-factor authentication for all non-console access,Critical,ISO27001-9.4,NIST-PR.AC-7,2024-03-30
+PCI014,Encrypted authentication data,Cryptography,Render authentication data unreadable anywhere it is stored,Critical,ISO27001-10.1,NIST-PR.DS-1,2024-03-30
+PCI015,Secure coding practices,Development,Implement secure coding practices in development processes,Medium,ISO27001-14.2,NIST-PR.IP-1,2024-03-30
+PCI016,Change detection,Integrity,Deploy file integrity monitoring or change detection software,Medium,ISO27001-12.1,NIST-DE.CM-3,2024-03-30
+PCI017,Penetration testing,Validation,Perform penetration testing at least annually,Medium,ISO27001-14.2,NIST-DE.DP-5,2024-03-30
+PCI018,Incident response,Response,Maintain an incident response plan,High,ISO27001-16.1,NIST-RS.RP-1,2024-03-30
+PCI019,Vulnerability management,Risk Management,Identify and manage vulnerabilities,High,ISO27001-12.6,NIST-DE.CM-8,2024-03-30
+PCI020,Secure remote access,Remote Access,Implement secure remote access procedures,High,ISO27001-13.2,NIST-PR.AC-3,2024-03-30
+PCI021,Wireless security,Wireless,Implement strong wireless security measures,Medium,ISO27001-13.1,NIST-PR.AC-4,2024-03-30
+PCI022,Encryption key management,Key Management,Implement proper cryptographic key management,Critical,ISO27001-10.1,NIST-PR.DS-8,2024-03-30
+PCI023,Secure deletion,Data Disposal,Securely delete cardholder data when no longer needed,High,ISO27001-8.3,NIST-PR.DS-3,2024-03-30
+PCI024,Network segmentation,Architecture,Implement network segmentation to isolate cardholder data environment,High,ISO27001-13.1,NIST-PR.AC-4,2024-03-30
+PCI025,Security awareness,Training,Implement security awareness training for all personnel,Medium,ISO27001-7.2,NIST-PR.AT-1,2024-03-30

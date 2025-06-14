@@ -1,0 +1,25 @@
+id,label,category,description,criticality,xref_iso,xref_nist,version
+HDS001,Politique de sécurité,Gouvernance,Définition et mise en œuvre d'une politique de sécurité documentée,Critical,ISO27001-5.2,NIST-ID.GV-1,2024-05-10
+HDS002,Gestion des identités,Accès,Contrôle des accès utilisateurs et gestion des identités numériques,High,ISO27001-9.2,NIST-PR.AC-1,2024-05-10
+HDS003,Chiffrement des données,Protection,Chiffrement des données de santé en transit et au repos,Critical,ISO27001-10.1,NIST-PR.DS-1,2024-05-10
+HDS004,Sauvegarde et archivage,Continuité,Procédures de sauvegarde et d'archivage sécurisées,High,ISO27001-12.3,NIST-PR.IP-4,2024-05-10
+HDS005,Traçabilité des accès,Surveillance,Logging et monitoring des accès aux données de santé,High,ISO27001-12.4,NIST-DE.AE-3,2024-05-10
+HDS006,Plan de continuité,Résilience,Plan de continuité d'activité et de reprise après incident,Critical,ISO27001-17.1,NIST-RC.RP-1,2024-05-10
+HDS007,Formation du personnel,Sensibilisation,Formation à la sécurité des données de santé,Medium,ISO27001-7.2,NIST-PR.AT-1,2024-05-10
+HDS008,Gestion des incidents,Réponse,Procédures de gestion des incidents de sécurité,High,ISO27001-16.1,NIST-RS.RP-1,2024-05-10
+HDS009,Audit et contrôle,Vérification,Audits réguliers de sécurité et contrôles internes,Medium,ISO27001-9.1,NIST-ID.RA-1,2024-05-10
+HDS010,Sécurité physique,Infrastructure,Protection physique des équipements et locaux,High,ISO27001-11.1,NIST-PR.AC-2,2024-05-10
+HDS011,Gestion des vulnérabilités,Maintenance,Identification et correction des vulnérabilités,High,ISO27001-12.6,NIST-DE.CM-8,2024-05-10
+HDS012,Pseudonymisation,Anonymisation,Techniques de pseudonymisation des données patients,Medium,ISO27001-13.1,NIST-PR.DS-3,2024-05-10
+HDS013,Destruction sécurisée,Élimination,Procédures de destruction sécurisée des supports,Medium,ISO27001-8.3,NIST-PR.DS-3,2024-05-10
+HDS014,Gestion des tiers,Partenariat,Contrôle sécuritaire des prestataires et sous-traitants,High,ISO27001-15.1,NIST-ID.SC-1,2024-05-10
+HDS015,Test de sécurité,Validation,Tests d'intrusion et évaluations de sécurité,Medium,ISO27001-14.2,NIST-DE.DP-5,2024-05-10
+HDS016,Ségrégation réseau,Architecture,Isolation et segmentation des réseaux de données,High,ISO27001-13.1,NIST-PR.AC-4,2024-05-10
+HDS017,Authentification forte,Authentification,Mise en place d'authentification multi-facteurs,Critical,ISO27001-9.4,NIST-PR.AC-7,2024-05-10
+HDS018,Supervision technique,Monitoring,Surveillance technique en temps réel des systèmes,Medium,ISO27001-12.4,NIST-DE.CM-1,2024-05-10
+HDS019,Gestion des changements,Évolution,Procédures de gestion des changements système,Medium,ISO27001-14.2,NIST-PR.IP-3,2024-05-10
+HDS020,Documentation,Traçabilité,Documentation complète des procédures de sécurité,Medium,ISO27001-7.5,NIST-ID.GV-2,2024-05-10
+HDS021,Analyse des risques,Évaluation,Évaluation régulière des risques sur les données de santé,High,ISO27001-6.1,NIST-ID.RA-3,2024-05-10
+HDS022,Chiffrement end-to-end,Communication,Chiffrement bout en bout des communications,High,ISO27001-13.1,NIST-PR.DS-2,2024-05-10
+HDS023,Contrôle d'intégrité,Vérification,Vérification de l'intégrité des données stockées,High,ISO27001-10.1,NIST-PR.DS-6,2024-05-10
+HDS024,Réponse aux violations,Incident,Procédures de notification en cas de violation de données,Critical,ISO27001-16.1,NIST-RS.CO-2,2024-05-10
