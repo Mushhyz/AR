@@ -1,0 +1,123 @@
+# Configuration EBIOS RM - Paramètres centralisés
+
+metadata:
+  version: "2.0"
+  date_creation: "2024-12-14"
+  responsable: "RSSI"
+  organisation: "Votre Organisation"
+
+# Échelles de valeurs
+echelles:
+  gravite:
+    type: "impact"
+    niveaux:
+      1: {libelle: "Négligeable", description: "Impact minimal", couleur: "#27AE60"}
+      2: {libelle: "Limité", description: "Impact modéré", couleur: "#F39C12"}
+      3: {libelle: "Important", description: "Impact significatif", couleur: "#E74C3C"}
+      4: {libelle: "Critique", description: "Impact majeur", couleur: "#C0392B"}
+  
+  vraisemblance:
+    type: "likelihood"
+    niveaux:
+      1: {libelle: "Minimal", description: "Très peu probable", frequence: "> 10 ans"}
+      2: {libelle: "Significatif", description: "Possible", frequence: "1-10 ans"}
+      3: {libelle: "Élevé", description: "Probable", frequence: "1-5 ans"}
+      4: {libelle: "Maximal", description: "Quasi-certain", frequence: "< 1 an"}
+
+# Sources de risque personnalisées
+sources_risque:
+  categories:
+    - "Criminalité organisée"
+    - "Espionnage d'État"
+    - "Menace interne"
+    - "Activisme numérique"
+    - "Chaîne d'approvisionnement"
+    - "Espionnage commercial"
+    - "Opportunisme"
+  
+  motivations:
+    - "Gain financier"
+    - "Intelligence économique"
+    - "Vengeance"
+    - "Idéologie"
+    - "Reconnaissance"
+    - "Avantage concurrentiel"
+
+# Scenarios strategiques
+scenarios_strategiques:
+  objectifs_types:
+    - "Vol de données"
+    - "Sabotage système"
+    - "Espionnage"
+    - "Défiguration"
+    - "Rançongiciel"
+    - "Déni de service"
+  
+  chemins_attaque:
+    - "Attaque externe"
+    - "Abus de privilèges"
+    - "APT"
+    - "Surface publique"
+    - "Supply chain"
+    - "Ingénierie sociale"
+
+# Vecteurs d'attaque opérationnels
+vecteurs_attaque:
+  techniques:
+    - "Phishing/Spear phishing"
+    - "Exploitation vulnérabilités"
+    - "Accès physique"
+    - "Ingénierie sociale"
+    - "Supply chain"
+    - "Malware/Ransomware"
+    - "Man-in-the-middle"
+    - "Brute force"
+  
+  etapes_kill_chain:
+    - "Reconnaissance"
+    - "Weaponization"
+    - "Delivery"
+    - "Exploitation"
+    - "Installation"
+    - "Command & Control"
+    - "Actions on objectives"
+
+# Matrice de risque
+matrice_risque:
+  type: "4x4"
+  seuils:
+    acceptable: [1, 2, 3]  # Scores considérés comme acceptables
+    attention: [4, 6, 8]   # Scores nécessitant attention
+    critique: [9, 12, 16]  # Scores critiques
+  
+  correspondance:
+    1: "Faible"
+    2: "Faible" 
+    3: "Moyen"
+    4: "Moyen"
+    6: "Élevé"
+    8: "Élevé"
+    9: "Critique"
+    12: "Critique"
+    16: "Critique"
+
+# Configuration PME simplifiée
+pme_config:
+  echelles_simplifiees: true
+  nb_sources_max: 5
+  nb_scenarios_max: 10
+  formation_obligatoire: true
+  
+# Paramètres d'export
+export:
+  formats_supportes: ["xlsx", "json", "pdf", "markdown"]
+  couleurs_risque:
+    Faible: "#27AE60"
+    Moyen: "#F39C12"
+    Élevé: "#E74C3C"
+    Critique: "#C0392B"
+  
+  templates:
+    standard: "templates/ebios_standard.xlsx"
+    pme: "templates/ebios_pme.xlsx"
+    sectoriel: "templates/ebios_secteur.xlsx"

@@ -1,0 +1,1126 @@
+"""
+Générateur de template Excel EBIOS RM conforme aux spécifications.
+Crée l'onglet __REFS avec toutes les tables de référence et plages nommées.
+Applique les validations de données selon la méthodologie EBIOS RM.
+"""
+
+from pathlib import Path
+from typing import Dict, List, Any
+import logging
+
+from openpyxl import Workbook
+from openpyxl.worksheet.datavalidation import DataValidation
+from openpyxl.worksheet.table import Table, TableStyleInfo
+from openpyxl.styles import Font, PatternFill, Alignment, Protection
+from openpyxl.workbook.defined_name import DefinedName
+from openpyxl.worksheet.protection import SheetProtection
+from openpyxl.utils import get_column_letter
+
+logger = logging.getLogger(__name__)
+
+class EBIOSTemplateGenerator:
+    """Générateur de template Excel EBIOS RM avec validation complète."""
+    
+    def __init__(self):
+        """Initialise le générateur avec les styles et données de référence."""
+        self.wb = Workbook()
+        # Styles pour le formatage
+        self.gray_fill = PatternFill(start_color="D9D9D9", end_color="D9D9D9", fill_type="solid")
+        self.header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+        self.header_font = Font(bold=True, color="FFFFFF")
+        
+        # Données de référence EBIOS RM conformes
+        self.reference_data = self._get_ebios_reference_data()
+    
+    def _get_ebios_reference_data(self) -> Dict[str, List[Dict[str, Any]]]:
+        """Définit les données de référence EBIOS RM conformes à la méthodologie."""
+        return {
+            # Table des niveaux de gravité (échelle 4 niveaux)
+            "tbl_Gravite": [
+                {"ID": 1, "Libelle": "Négligeable", "Valeur": 1},
+                {"ID": 2, "Libelle": "Limité", "Valeur": 2},
+                {"ID": 3, "Libelle": "Important", "Valeur": 3},
+                {"ID": 4, "Libelle": "Critique", "Valeur": 4}
+            ],
+            
+            # Table des niveaux de vraisemblance (échelle 4 niveaux)
+            "tbl_Vraisemblance": [
+                {"ID": 1, "Libelle": "Minimal", "Valeur": 1},
+                {"ID": 2, "Libelle": "Significatif", "Valeur": 2},
+                {"ID": 3, "Libelle": "Élevé", "Valeur": 3},
+                {"ID": 4, "Libelle": "Maximal", "Valeur": 4}
+            ],
+            
+            # **CORRECTION 1.3** : Ajouter les tables manquantes pour pertinence/exposition
+            "tbl_Pertinence": [
+                {"ID": 1, "Libelle": "Faible", "Valeur": 1},
+                {"ID": 2, "Libelle": "Modérée", "Valeur": 2},
+                {"ID": 3, "Libelle": "Forte", "Valeur": 3}
+            ],
+            
+            "tbl_Exposition": [
+                {"ID": 1, "Libelle": "Limitée", "Valeur": 1},
+                {"ID": 2, "Libelle": "Significative", "Valeur": 2},
+                {"ID": 3, "Libelle": "Maximale", "Valeur": 3}
+            ],
+            
+            # **CORRECTION 1** : Catalogue complet des mesures de sécurité EBIOS RM
+            "tbl_Measure": [
+                {"Measure_ID": "M001", "Libelle": "Authentification multi-facteurs", "Category": "Accès", "Type": "Préventif", "Score": 3},
+                {"Measure_ID": "M002", "Libelle": "Chiffrement des données", "Category": "Données", "Type": "Préventif", "Score": 4},
+                {"Measure_ID": "M003", "Libelle": "Supervision SOC", "Category": "Monitoring", "Type": "Détectif", "Score": 3},
+                {"Measure_ID": "M004", "Libelle": "Sauvegarde externalisée", "Category": "Continuité", "Type": "Récupération", "Score": 2},
+                {"Measure_ID": "M005", "Libelle": "Formation sensibilisation", "Category": "Humain", "Type": "Préventif", "Score": 2},
+                {"Measure_ID": "M006", "Libelle": "Pare-feu applicatif", "Category": "Réseau", "Type": "Préventif", "Score": 3},
+                {"Measure_ID": "M007", "Libelle": "Plan de continuité", "Category": "Continuité", "Type": "Récupération", "Score": 4},
+                {"Measure_ID": "M008", "Libelle": "Audit de sécurité", "Category": "Gouvernance", "Type": "Détectif", "Score": 2},
+                {"Measure_ID": "M009", "Libelle": "Contrôle d'accès physique", "Category": "Physique", "Type": "Préventif", "Score": 3},
+                {"Measure_ID": "M010", "Libelle": "Gestion des correctifs", "Category": "Systèmes", "Type": "Préventif", "Score": 4}
+            ],
+            
+            # **NOUVELLE EXTENSION** : Catalogue complet des mesures ISO 27001 Annex A 2022
+            "tbl_Measure": [
+                {"Measure_ID": "A.5.1", "Libelle": "Politiques de sécurité de l'information", "Category": "Organisationnelles", "Cout": 2, "Efficacite_pct": 80, "AnnexA_Control": "A.5.1"},
+                {"Measure_ID": "A.5.2", "Libelle": "Rôles et responsabilités en matière de sécurité", "Category": "Organisationnelles", "Cout": 1, "Efficacite_pct": 70, "AnnexA_Control": "A.5.2"},
+                {"Measure_ID": "A.5.3", "Libelle": "Séparation des tâches", "Category": "Organisationnelles", "Cout": 2, "Efficacite_pct": 85, "AnnexA_Control": "A.5.3"},
+                {"Measure_ID": "A.6.1", "Libelle": "Criblage des antécédents", "Category": "Personnel", "Cout": 2, "Efficacite_pct": 75, "AnnexA_Control": "A.6.1"},
+                {"Measure_ID": "A.6.2", "Libelle": "Termes et conditions d'emploi", "Category": "Personnel", "Cout": 1, "Efficacite_pct": 60, "AnnexA_Control": "A.6.2"},
+                {"Measure_ID": "A.6.3", "Libelle": "Sensibilisation et formation à la sécurité", "Category": "Personnel", "Cout": 3, "Efficacite_pct": 90, "AnnexA_Control": "A.6.3"},
+                {"Measure_ID": "A.6.4", "Libelle": "Processus disciplinaire", "Category": "Personnel", "Cout": 1, "Efficacite_pct": 65, "AnnexA_Control": "A.6.4"},
+                {"Measure_ID": "A.7.1", "Libelle": "Sécurité physique des zones", "Category": "Physiques", "Cout": 4, "Efficacite_pct": 95, "AnnexA_Control": "A.7.1"},
+                {"Measure_ID": "A.7.2", "Libelle": "Contrôles physiques d'entrée", "Category": "Physiques", "Cout": 3, "Efficacite_pct": 90, "AnnexA_Control": "A.7.2"},
+                {"Measure_ID": "A.7.3", "Libelle": "Protection contre les menaces environnementales", "Category": "Physiques", "Cout": 4, "Efficacite_pct": 85, "AnnexA_Control": "A.7.3"},
+                {"Measure_ID": "A.8.1", "Libelle": "Gestion des actifs", "Category": "Techniques", "Cout": 2, "Efficacite_pct": 80, "AnnexA_Control": "A.8.1"},
+                {"Measure_ID": "A.8.2", "Libelle": "Classification de l'information", "Category": "Techniques", "Cout": 2, "Efficacite_pct": 85, "AnnexA_Control": "A.8.2"},
+                {"Measure_ID": "A.8.3", "Libelle": "Manipulation des supports", "Category": "Techniques", "Cout": 2, "Efficacite_pct": 75, "AnnexA_Control": "A.8.3"},
+                {"Measure_ID": "A.9.1", "Libelle": "Contrôle d'accès", "Category": "Techniques", "Cout": 3, "Efficacite_pct": 95, "AnnexA_Control": "A.9.1"},
+                {"Measure_ID": "A.9.2", "Libelle": "Gestion des accès utilisateur", "Category": "Techniques", "Cout": 3, "Efficacite_pct": 90, "AnnexA_Control": "A.9.2"},
+                {"Measure_ID": "A.9.3", "Libelle": "Gestion des accès privilégiés", "Category": "Techniques", "Cout": 4, "Efficacite_pct": 95, "AnnexA_Control": "A.9.3"},
+                {"Measure_ID": "A.9.4", "Libelle": "Gestion des informations d'authentification secrètes", "Category": "Techniques", "Cout": 3, "Efficacite_pct": 90, "AnnexA_Control": "A.9.4"},
+                {"Measure_ID": "A.10.1", "Libelle": "Chiffrement", "Category": "Techniques", "Cout": 3, "Efficacite_pct": 95, "AnnexA_Control": "A.10.1"},
+                {"Measure_ID": "A.10.2", "Libelle": "Gestion des clés cryptographiques", "Category": "Techniques", "Cout": 4, "Efficacite_pct": 90, "AnnexA_Control": "A.10.2"},
+                {"Measure_ID": "A.11.1", "Libelle": "Sauvegarde des informations", "Category": "Techniques", "Cout": 2, "Efficacite_pct": 85, "AnnexA_Control": "A.11.1"},
+                {"Measure_ID": "A.11.2", "Libelle": "Redondance des équipements de traitement", "Category": "Techniques", "Cout": 4, "Efficacite_pct": 90, "AnnexA_Control": "A.11.2"},
+                {"Measure_ID": "A.12.1", "Libelle": "Sécurité des réseaux", "Category": "Techniques", "Cout": 3, "Efficacite_pct": 90, "AnnexA_Control": "A.12.1"},
+                {"Measure_ID": "A.12.2", "Libelle": "Séparation des réseaux", "Category": "Techniques", "Cout": 3, "Efficacite_pct": 85, "AnnexA_Control": "A.12.2"},
+                {"Measure_ID": "A.13.1", "Libelle": "Gestion de la sécurité des applications", "Category": "Techniques", "Cout": 4, "Efficacite_pct": 85, "AnnexA_Control": "A.13.1"},
+                {"Measure_ID": "A.13.2", "Libelle": "Développement sécurisé", "Category": "Techniques", "Cout": 4, "Efficacite_pct": 90, "AnnexA_Control": "A.13.2"},
+                {"Measure_ID": "A.14.1", "Libelle": "Gestion des incidents de sécurité", "Category": "Organisationnelles", "Cout": 3, "Efficacite_pct": 85, "AnnexA_Control": "A.14.1"},
+                {"Measure_ID": "A.14.2", "Libelle": "Apprentissage des incidents", "Category": "Organisationnelles", "Cout": 2, "Efficacite_pct": 75, "AnnexA_Control": "A.14.2"},
+                {"Measure_ID": "A.15.1", "Libelle": "Continuité de la sécurité", "Category": "Organisationnelles", "Cout": 4, "Efficacite_pct": 90, "AnnexA_Control": "A.15.1"},
+                {"Measure_ID": "A.15.2", "Libelle": "Redondances", "Category": "Organisationnelles", "Cout": 4, "Efficacite_pct": 85, "AnnexA_Control": "A.15.2"},
+                {"Measure_ID": "A.16.1", "Libelle": "Conformité réglementaire", "Category": "Juridiques", "Cout": 3, "Efficacite_pct": 80, "AnnexA_Control": "A.16.1"},
+                {"Measure_ID": "A.16.2", "Libelle": "Audits de sécurité", "Category": "Juridiques", "Cout": 3, "Efficacite_pct": 85, "AnnexA_Control": "A.16.2"}
+            ],
+            
+            # **NOUVELLE EXTENSION** : Table des sous-types d'actifs pour listes dépendantes
+            "tbl_AssetSubtype": [
+                {"Asset_Type_ID": "AT001", "Subtype": "Serveur Web", "Description": "Serveur hébergeant applications web"},
+                {"Asset_Type_ID": "AT001", "Subtype": "Serveur Base", "Description": "Serveur de base de données"},
+                {"Asset_Type_ID": "AT001", "Subtype": "Serveur Mail", "Description": "Serveur de messagerie"},
+                {"Asset_Type_ID": "AT002", "Subtype": "MySQL", "Description": "Base MySQL"},
+                {"Asset_Type_ID": "AT002", "Subtype": "PostgreSQL", "Description": "Base PostgreSQL"},
+                {"Asset_Type_ID": "AT002", "Subtype": "Oracle", "Description": "Base Oracle"},
+                {"Asset_Type_ID": "AT003", "Subtype": "Web App", "Description": "Application web"},
+                {"Asset_Type_ID": "AT003", "Subtype": "Mobile App", "Description": "Application mobile"},
+                {"Asset_Type_ID": "AT003", "Subtype": "Desktop App", "Description": "Application bureautique"},
+                {"Asset_Type_ID": "AT006", "Subtype": "Données clients", "Description": "Informations clients"},
+                {"Asset_Type_ID": "AT006", "Subtype": "Données RH", "Description": "Informations ressources humaines"},
+                {"Asset_Type_ID": "AT006", "Subtype": "Données financières", "Description": "Informations financières"}
+            ],
+            
+            # **NOUVELLE EXTENSION** : Table des KPI de maturité
+            "tbl_KPI": [
+                {"KPI_ID": "VEL001", "Libelle": "Velocity Detection", "Category": "Velocity", "Target": 24, "Unit": "heures", "Formula": "Temps moyen détection incident"},
+                {"KPI_ID": "VEL002", "Libelle": "Velocity Response", "Category": "Velocity", "Target": 4, "Unit": "heures", "Formula": "Temps moyen réponse incident"},
+                {"KPI_ID": "PREP001", "Libelle": "Preparedness Coverage", "Category": "Preparedness", "Target": 95, "Unit": "%", "Formula": "% actifs couverts par mesures"},
+                {"KPI_ID": "PREP002", "Libelle": "Preparedness Training", "Category": "Preparedness", "Target": 90, "Unit": "%", "Formula": "% personnel formé"},
+                {"KPI_ID": "MAT001", "Libelle": "Maturity Overall", "Category": "Maturity", "Target": 3, "Unit": "niveau", "Formula": "Niveau maturité global (1-5)"}
+            ],
+            
+            # Catalogue des sources de risque EBIOS RM
+            "tbl_Source": [
+                {
+                    "Source_ID": "RS001",
+                    "Label": "Cybercriminels organisés",
+                    "Category": "Criminalité organisée",
+                    "MotivationResources": "Gain financier - Outils avancés",
+                    "Targeting": "Données sensibles et systèmes de paiement"
+                },
+                {
+                    "Source_ID": "RS002", 
+                    "Label": "Acteurs étatiques",
+                    "Category": "Espionnage d'État",
+                    "MotivationResources": "Intelligence économique - Ressources illimitées",
+                    "Targeting": "Informations stratégiques et propriété intellectuelle"
+                },
+                {
+                    "Source_ID": "RS003",
+                    "Label": "Employés malveillants", 
+                    "Category": "Menace interne",
+                    "MotivationResources": "Vengeance ou gain personnel - Accès privilégié",
+                    "Targeting": "Données confidentielles et systèmes internes"
+                },
+                {
+                    "Source_ID": "RS004",
+                    "Label": "Hacktivistes",
+                    "Category": "Activisme numérique",
+                    "MotivationResources": "Idéologie - Outils collaboratifs",
+                    "Targeting": "Sites web et communication publique"
+                },
+                {
+                    "Source_ID": "RS005",
+                    "Label": "Prestataires compromis",
+                    "Category": "Chaîne d'approvisionnement",
+                    "MotivationResources": "Accès indirect - Privilèges étendus",
+                    "Targeting": "Systèmes clients via relations de confiance"
+                }
+            ],
+            
+            # Catalogue des scénarios stratégiques
+            "tbl_Scenario": [
+                {
+                    "Scenario_ID": "SR001",
+                    "Risk_Source": "RS001",
+                    "Target_Objective": "Vol de données clients",
+                    "Attack_Path": "Attaque externe ciblée",
+                    "Motivation": "Revente de données personnelles"
+                },
+                {
+                    "Scenario_ID": "SR002",
+                    "Risk_Source": "RS003", 
+                    "Target_Objective": "Sabotage système",
+                    "Attack_Path": "Abus de privilèges internes",
+                    "Motivation": "Vengeance après licenciement"
+                },
+                {
+                    "Scenario_ID": "SR003",
+                    "Risk_Source": "RS002",
+                    "Target_Objective": "Espionnage industriel",
+                    "Attack_Path": "APT ciblée longue durée",
+                    "Motivation": "Avantage concurrentiel étatique"
+                },
+                {
+                    "Scenario_ID": "SR004",
+                    "Risk_Source": "RS004",
+                    "Target_Objective": "Défiguration site web",
+                    "Attack_Path": "Attaque de surface publique",
+                    "Motivation": "Message politique ou social"
+                }
+            ],
+            
+            # Catalogue des scénarios opérationnels (OV)
+            "tbl_OV": [
+                {
+                    "OV_ID": "OV001",
+                    "Strategic_Scenario": "SR001",
+                    "Attack_Vector": "Phishing et ingénierie sociale",
+                    "Operational_Steps": "Reconnaissance > Intrusion > Persistance > Exfiltration"
+                },
+                {
+                    "OV_ID": "OV002",
+                    "Strategic_Scenario": "SR002",
+                    "Attack_Vector": "Accès physique et logique",
+                    "Operational_Steps": "Planification > Exécution > Effacement traces"
+                },
+                {
+                    "OV_ID": "OV003",
+                    "Strategic_Scenario": "SR003",
+                    "Attack_Vector": "Compromission chaîne logicielle",
+                    "Operational_Steps": "Infiltration > Installation > C&C > Collecte > Exfiltration"
+                },
+                {
+                    "OV_ID": "OV004",
+                    "Strategic_Scenario": "SR004",
+                    "Attack_Vector": "Exploitation vulnérabilités web",
+                    "Operational_Steps": "Scan > Exploitation > Défiguration > Revendication"
+                }
+            ],
+            
+            # Table des types d'actifs avec libellés complets
+            "tbl_AssetType": [
+                {"Asset_Type_ID": "AT001", "Libelle": "Serveur", "Description": "Serveurs physiques et virtuels"},
+                {"Asset_Type_ID": "AT002", "Libelle": "Base de données", "Description": "Systèmes de gestion de base de données"},
+                {"Asset_Type_ID": "AT003", "Libelle": "Application", "Description": "Applications métier et logiciels"},
+                {"Asset_Type_ID": "AT004", "Libelle": "Réseau", "Description": "Infrastructure réseau et télécoms"},
+                {"Asset_Type_ID": "AT005", "Libelle": "Poste de travail", "Description": "Postes utilisateurs et périphériques"},
+                {"Asset_Type_ID": "AT006", "Libelle": "Données", "Description": "Données et informations sensibles"},
+                {"Asset_Type_ID": "AT007", "Libelle": "Personnel", "Description": "Ressources humaines et compétences"},
+                {"Asset_Type_ID": "AT008", "Libelle": "Locaux", "Description": "Sites et infrastructures physiques"},
+                {"Asset_Type_ID": "AT009", "Libelle": "Processus", "Description": "Processus métier et procédures"}
+            ],
+            
+            # Table des parties prenantes avec libellés complets
+            "tbl_Stakeholder": [
+                {"Stakeholder_ID": "SH001", "Libelle": "DSI", "Description": "Direction des Systèmes d'Information"},
+                {"Stakeholder_ID": "SH002", "Libelle": "Direction", "Description": "Direction Générale"},
+                {"Stakeholder_ID": "SH003", "Libelle": "RSSI", "Description": "Responsable Sécurité des Systèmes d'Information"},
+                {"Stakeholder_ID": "SH004", "Libelle": "DPO", "Description": "Délégué à la Protection des Données"},
+                {"Stakeholder_ID": "SH005", "Libelle": "Métier", "Description": "Directions métier"},
+                {"Stakeholder_ID": "SH006", "Libelle": "Support", "Description": "Support technique et maintenance"},
+                {"Stakeholder_ID": "SH007", "Libelle": "Externe", "Description": "Prestataires externes"},
+                {"Stakeholder_ID": "SH008", "Libelle": "Fournisseur", "Description": "Fournisseurs et partenaires"}
+            ]
+        }
+
+    def generate_template(self, output_path: Path, pme_profile: bool = False) -> None:
+        """Génère le template Excel complet conforme EBIOS RM."""
+        logger.info("Génération du template Excel EBIOS RM...")
+        
+        if pme_profile:
+            logger.info("Mode PME/TPE activé - Configuration simplifiée")
+        
+        # Supprimer la feuille par défaut
+        if "Sheet" in self.wb.sheetnames:
+            self.wb.remove(self.wb["Sheet"])
+        
+        # 1. Créer l'onglet de références avec toutes les tables
+        self._create_references_sheet()
+        
+        # 2. Créer l'onglet de configuration EBIOS RM
+        self._create_config_sheet(pme_profile)
+        
+        # 3. Créer les onglets de travail EBIOS RM complets
+        self._create_atelier1_socle()
+        self._create_atelier2_sources()
+        self._create_atelier3_scenarios() 
+        self._create_atelier4_operationnels()
+        self._create_atelier5_traitement()  # **CORRECTION 1** : Ajout du 5ème atelier
+        self._create_synthese()
+        
+        # 4. Configuration finale
+        self.wb["__REFS"].sheet_state = "veryHidden"  # Masquer l'onglet références
+        self.wb.active = self.wb["Config_EBIOS"]    # Définir la feuille de config comme active
+        
+        # 5. Sauvegarder le classeur
+        self.wb.save(output_path)
+        logger.info(f"Template généré avec succès : {output_path}")
+
+    def _create_references_sheet(self) -> None:
+        """Crée l'onglet __REFS avec toutes les tables de référence et plages nommées."""
+        ws = self.wb.create_sheet("__REFS")
+        
+        current_col = 1  # Position de départ pour les tables
+        
+        # Créer chaque table de référence
+        for table_name, data in self.reference_data.items():
+            if not data:
+                continue
+                
+            # Extraire les en-têtes de la première ligne de données
+            headers = list(data[0].keys())
+            start_row = 1
+            start_col = current_col
+            
+            # Écrire les en-têtes avec style
+            for i, header in enumerate(headers):
+                cell = ws.cell(row=start_row, column=start_col + i, value=header)
+                cell.font = self.header_font
+                cell.fill = self.header_fill
+                cell.alignment = Alignment(horizontal="center")
+            
+            # Écrire les données de référence
+            for row_idx, row_data in enumerate(data, start=2):
+                for col_idx, (key, value) in enumerate(row_data.items()):
+                    ws.cell(row=row_idx, column=start_col + col_idx, value=value)
+            
+            # Créer la table Excel pour cette référence
+            end_row = len(data) + 1
+            end_col = start_col + len(headers) - 1
+            table_ref = f"{get_column_letter(start_col)}{start_row}:{get_column_letter(end_col)}{end_row}"
+            
+            table = Table(displayName=table_name, ref=table_ref)
+            table.tableStyleInfo = TableStyleInfo(
+                name="TableStyleMedium2", 
+                showFirstColumn=False,
+                showRowStripes=True
+            )
+            ws.add_table(table)
+            
+            # Créer les plages nommées pour les validations
+            self._create_named_ranges_for_table(ws, table_name, headers, start_col, start_row, end_row)
+            
+            # Passer à la position suivante (avec espacement)
+            current_col = end_col + 2
+        
+        # **CORRECTION 1.1** : Ajouter les plages pour Pertinence/Exposition
+        pertinence_range = f"__REFS!$A$2:$A$4"  # Ajuster selon position réelle
+        exposition_range = f"__REFS!$A$2:$A$4"   # Ajuster selon position réelle
+        
+        self.wb.defined_names["Pertinence"] = DefinedName("Pertinence", attr_text=pertinence_range)
+        self.wb.defined_names["Exposition"] = DefinedName("Exposition", attr_text=exposition_range)
+
+    def _create_named_ranges_for_table(self, ws, table_name: str, headers: List[str], 
+                                      start_col: int, start_row: int, end_row: int) -> None:
+        """Crée les plages nommées nécessaires pour les validations et formules XLOOKUP."""
+        
+        # **CORRECTION 2** : Mapping complet avec toutes les plages requises
+        range_mappings = {
+            "tbl_Gravite": {"Libelle": "Gravite", "ID": "tbl_Gravite_ID", "Valeur": "tbl_Gravite_Valeur"},
+            "tbl_Vraisemblance": {"Libelle": "Vraisemblance", "ID": "tbl_Vraisemblance_ID", "Valeur": "tbl_Vraisemblance_Valeur"}, 
+            "tbl_ValeurMetier": {"ID": "Valeur_Metier", "Libelle": "tbl_ValeurMetier_ID", "Valeur": "tbl_ValeurMetier_Valeur"},
+            "tbl_Pertinence": {"Libelle": "Pertinence", "ID": "tbl_Pertinence_ID", "Valeur": "tbl_Pertinence_Valeur"},
+            "tbl_Exposition": {"Libelle": "Exposition", "ID": "tbl_Exposition_ID", "Valeur": "tbl_Exposition_Valeur"},
+            "tbl_Measure": {"Measure_ID": "Measure_ID", "Libelle": "tbl_Measure_Label"},
+            "tbl_Source": {"Source_ID": "Source_ID"},
+            "tbl_Scenario": {"Scenario_ID": "Scenario_ID"},
+            "tbl_OV": {"OV_ID": "OV_ID"},
+            "tbl_AssetType": {"Asset_Type_ID": "Asset_Type", "Libelle": "tbl_AssetType_Label"},
+            "tbl_Stakeholder": {"Stakeholder_ID": "Stakeholder_ID", "Libelle": "tbl_Stakeholder_Label"}
+        }
+        
+        # Créer les plages nommées principales avec vérification
+        if table_name in range_mappings:
+            for header_name, range_name in range_mappings[table_name].items():
+                if header_name in headers:
+                    col_idx = headers.index(header_name)
+                    col_letter = get_column_letter(start_col + col_idx)
+                    
+                    # Vérifier que la plage est valide
+                    if end_row > start_row:
+                        range_ref = f"__REFS!${col_letter}$2:${col_letter}${end_row}"
+                        defined_name = DefinedName(range_name, attr_text=range_ref)
+                        
+                        # Ajouter la plage nommée au classeur
+                        self.wb.defined_names[range_name] = defined_name
+                        logger.info(f"Plage nommée créée: {range_name} = {range_ref}")
+        
+        # Créer des plages nommées détaillées pour XLOOKUP avec tables complètes
+        detailed_mappings = {
+            "tbl_Source": ["Source_ID", "Label", "Category", "MotivationResources", "Targeting"],
+            "tbl_Scenario": ["Scenario_ID", "Risk_Source", "Target_Objective", "Attack_Path", "Motivation"],
+            "tbl_OV": ["OV_ID", "Strategic_Scenario", "Attack_Vector", "Operational_Steps"]
+        }
+        
+        if table_name in detailed_mappings:
+            # Créer une plage pour toute la table pour XLOOKUP
+            table_start_col = get_column_letter(start_col)
+            table_end_col = get_column_letter(start_col + len(headers) - 1)
+            table_range = f"__REFS!${table_start_col}$2:${table_end_col}${end_row}"
+            table_range_name = f"{table_name}_Table"
+            
+            defined_name = DefinedName(table_range_name, attr_text=table_range)
+            self.wb.defined_names[table_range_name] = defined_name
+            logger.info(f"Table complète créée: {table_range_name} = {table_range}")
+            
+            # Créer des plages individuelles pour chaque colonne
+            for header_name in detailed_mappings[table_name]:
+                if header_name in headers:
+                    col_idx = headers.index(header_name)
+                    col_letter = get_column_letter(start_col + col_idx)
+                    
+                    range_name = f"{table_name}_{header_name}"
+                    
+                    if end_row > start_row:
+                        range_ref = f"__REFS!${col_letter}$2:${col_letter}${end_row}"
+                        defined_name = DefinedName(range_name, attr_text=range_ref)
+                        
+                        self.wb.defined_names[range_name] = defined_name
+                        logger.info(f"Plage détaillée créée: {range_name} = {range_ref}")
+        
+        # **CORRECTION 1.1** : Ajouter toutes les plages numériques pour calculs avancés
+        if table_name == "tbl_Gravite":
+            for header_name in ["ID", "Libelle", "Valeur"]:
+                if header_name in headers:
+                    col_idx = headers.index(header_name)
+                    col_letter = get_column_letter(start_col + col_idx)
+                    range_ref = f"__REFS!${col_letter}$2:${col_letter}${end_row}"
+                    
+                    if header_name == "Libelle":
+                        self.wb.defined_names["Gravity_Labels"] = DefinedName("Gravity_Labels", attr_text=range_ref)
+        
+        if table_name == "tbl_Vraisemblance":
+            for header_name in ["ID", "Libelle", "Valeur"]:
+                if header_name in headers:
+                    col_idx = headers.index(header_name)
+                    col_letter = get_column_letter(start_col + col_idx)
+                    range_ref = f"__REFS!${col_letter}$2:${col_letter}${end_row}"
+                    
+                    if header_name == "Libelle":
+                        self.wb.defined_names["Likelihood_Labels"] = DefinedName("Likelihood_Labels", attr_text=range_ref)
+        
+        if table_name == "tbl_ValeurMetier":
+            for header_name in ["ID", "Libelle", "Valeur"]:
+                if header_name in headers:
+                    col_idx = headers.index(header_name)
+                    col_letter = get_column_letter(start_col + col_idx)
+                    range_ref = f"__REFS!${col_letter}$2:${col_letter}${end_row}"
+                    
+                    if header_name == "Libelle":
+                        self.wb.defined_names["BusinessValue_Labels"] = DefinedName("BusinessValue_Labels", attr_text=range_ref)
+        
+        # **CORRECTION 1** : Plages pour les nouvelles tables
+        if table_name == "tbl_Measure":
+            for header_name in ["Measure_ID", "Libelle"]:
+                if header_name in headers:
+                    col_idx = headers.index(header_name)
+                    col_letter = get_column_letter(start_col + col_idx)
+                    range_ref = f"__REFS!${col_letter}$2:${col_letter}${end_row}"
+                    
+                    range_name = "Measure_ID" if header_name == "Measure_ID" else "tbl_Measure_Label"
+                    self.wb.defined_names[range_name] = DefinedName(range_name, attr_text=range_ref)
+
+    def _create_atelier1_socle(self) -> None:
+        """Crée l'Atelier 1 - Socle avec les validations appropriées et formule de risque pondérée."""
+        ws = self.wb.create_sheet("Atelier1_Socle")
+        
+        # En-têtes français selon EBIOS RM Atelier 1
+        headers = [
+            "ID_Actif", "Type", "Libellé", "Description", "Gravité",
+            "Confidentialité", "Intégrité", "Disponibilité", 
+            "Valeur_Métier", "Propriétaire", "Score_Risque"
+        ]
+        
+        # Créer les en-têtes avec style
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col, value=header)
+            cell.font = self.header_font
+            cell.fill = self.header_fill
+            cell.alignment = Alignment(horizontal="center")
+        
+        # Appliquer les validations de données selon EBIOS RM
+        validations_config = {
+            2: "Asset_Type",        # Colonne Type
+            5: "Gravite",           # Colonne Gravité
+            6: "Gravite",           # Colonne Confidentialité  
+            7: "Gravite",           # Colonne Intégrité
+            8: "Gravite",           # Colonne Disponibilité
+            9: "Valeur_Metier",     # Colonne Valeur Métier
+            10: "Stakeholder_ID",   # Colonne Propriétaire
+        }
+        
+        # Appliquer chaque validation avec le signe "=" obligatoire
+        for col_num, range_name in validations_config.items():
+            dv = DataValidation(type="list", formula1=f"={range_name}", allow_blank=True)
+            ws.add_data_validation(dv)
+            dv.add(f"{get_column_letter(col_num)}2:{get_column_letter(col_num)}100")
+        
+        # **CORRECTION 3** : Formule de risque pondérée corrigée avec XLOOKUP
+        for row in range(2, 101):
+            risk_formula = f"""=IF(AND(E{row}<>"",F{row}<>"",G{row}<>"",H{row}<>"",I{row}<>""),
+XLOOKUP(E{row},Gravite,tbl_Gravite_ID)*
+XLOOKUP(F{row},Gravite,tbl_Gravite_ID)*
+XLOOKUP(G{row},Gravite,tbl_Gravite_ID)*
+XLOOKUP(H{row},Gravite,tbl_Gravite_ID)*
+XLOOKUP(I{row},Valeur_Metier,tbl_ValeurMetier_ID),"")"""
+            
+            cell = ws.cell(row=row, column=11, value=risk_formula)
+            self._format_formula_cell(cell)
+        
+        # Ajouter des exemples de données
+        sample_data = [
+            ["A001", "", "Base clients", "Base de données des clients", "", "", "", "", "", "", ""],
+            ["A002", "", "Serveur web", "Serveur d'application web", "", "", "", "", "", "", ""],
+            ["A003", "", "Plans stratégiques", "Documents confidentiels", "", "", "", "", "", "", ""],
+        ]
+        
+        for row_idx, row_data in enumerate(sample_data, 2):
+            for col_idx, value in enumerate(row_data, 1):
+                if col_idx != 11:  # Ne pas écraser la formule de score
+                    ws.cell(row=row_idx, column=col_idx, value=value)
+        
+        # Appliquer la protection et le formatage
+        self._apply_sheet_protection(ws)
+        ws.freeze_panes = "B2"  # Figer les volets
+
+    def _create_atelier2_sources(self) -> None:
+        """Crée l'Atelier 2 - Sources de risque avec formules XLOOKUP fonctionnelles."""
+        ws = self.wb.create_sheet("Atelier2_Sources") 
+        
+        # En-têtes français selon EBIOS RM Atelier 2
+        headers = [
+            "ID_Source", "Libellé", "Catégorie", "Motivation_Ressources", 
+            "Ciblage", "Pertinence", "Exposition", "Commentaires"
+        ]
+        
+        # Créer les en-têtes
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col, value=header)
+            cell.font = self.header_font
+            cell.fill = self.header_fill
+            cell.alignment = Alignment(horizontal="center")
+        
+        # Validation ID_Source avec plage nommée
+        dv = DataValidation(type="list", formula1="=Source_ID", allow_blank=True)
+        ws.add_data_validation(dv)
+        dv.add("A2:A1000")
+        
+        # Formules XLOOKUP corrigées pour recherche dans toute la table
+        for row in range(2, 101):
+            # Libellé - recherche dans la table complète
+            cell = ws.cell(row=row, column=2, value=f"=IFERROR(INDEX(tbl_Source_Label,MATCH(A{row},tbl_Source_Source_ID,0)),\"\")")
+            self._format_formula_cell(cell)
+            
+            # Catégorie
+            cell = ws.cell(row=row, column=3, value=f"=IFERROR(INDEX(tbl_Source_Category,MATCH(A{row},tbl_Source_Source_ID,0)),\"\")")
+            self._format_formula_cell(cell)
+            
+            # Motivation_Ressources
+            cell = ws.cell(row=row, column=4, value=f"=IFERROR(INDEX(tbl_Source_MotivationResources,MATCH(A{row},tbl_Source_Source_ID,0)),\"\")")
+            self._format_formula_cell(cell)
+            
+            # Ciblage
+            cell = ws.cell(row=row, column=5, value=f"=IFERROR(INDEX(tbl_Source_Targeting,MATCH(A{row},tbl_Source_Source_ID,0)),\"\")")
+            self._format_formula_cell(cell)
+        
+        # Validations pour les niveaux d'évaluation
+        for col in [6, 7]:  # Pertinence, Exposition
+            dv = DataValidation(type="list", formula1="=Gravite", allow_blank=True)
+            ws.add_data_validation(dv)
+            dv.add(f"{get_column_letter(col)}2:{get_column_letter(col)}1000")
+        
+        # **CORRECTION 2** : Validations corrigées pour Pertinence/Exposition
+        pertinence_dv = DataValidation(type="list", formula1="=Pertinence", allow_blank=True)
+        ws.add_data_validation(pertinence_dv)
+        pertinence_dv.add("F2:F1000")
+        
+        exposition_dv = DataValidation(type="list", formula1="=Exposition", allow_blank=True)
+        ws.add_data_validation(exposition_dv)
+        exposition_dv.add("G2:G1000")
+        
+        # Protection et formatage
+        self._apply_sheet_protection(ws)
+        ws.freeze_panes = "B2"
+
+    def _create_atelier3_scenarios(self) -> None:
+        """Crée l'Atelier 3 - Scénarios stratégiques avec formules XLOOKUP et calcul de risque pondéré."""
+        ws = self.wb.create_sheet("Atelier3_Scenarios")
+        
+        # En-têtes français selon EBIOS RM Atelier 3
+        headers = [
+            "ID_Scénario", "Source_Risque", "Objectif_Visé", "Chemin_Attaque",
+            "Motivation", "Gravité", "Vraisemblance", "Valeur_Métier", "Risque_Calculé"
+        ]
+        
+        # Créer les en-têtes
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col, value=header)
+            cell.font = self.header_font
+            cell.fill = self.header_fill
+            cell.alignment = Alignment(horizontal="center")
+        
+        # Validation ID_Scénario
+        dv = DataValidation(type="list", formula1="=Scenario_ID", allow_blank=True)
+        ws.add_data_validation(dv)
+        dv.add("A2:A1000")
+        
+        # Formules RECHERCHEX pour remplissage automatique
+        for row in range(2, 101):
+            # Source_Risque - formule XLOOKUP corrigée
+            cell = ws.cell(row=row, column=2, value=f"=IFERROR(XLOOKUP(A{row},tbl_Scenario_Scenario_ID,tbl_Scenario_Risk_Source),\"\")")
+            self._format_formula_cell(cell)
+            
+            # Objectif_Visé
+            cell = ws.cell(row=row, column=3, value=f"=IFERROR(XLOOKUP(A{row},tbl_Scenario_Scenario_ID,tbl_Scenario_Target_Objective),\"\")")
+            self._format_formula_cell(cell)
+            
+            # Chemin_Attaque
+            cell = ws.cell(row=row, column=4, value=f"=IFERROR(XLOOKUP(A{row},tbl_Scenario_Scenario_ID,tbl_Scenario_Attack_Path),\"\")")
+            self._format_formula_cell(cell)
+            
+            # Motivation
+            cell = ws.cell(row=row, column=5, value=f"=IFERROR(XLOOKUP(A{row},tbl_Scenario_Scenario_ID,tbl_Scenario_Motivation),\"\")")
+            self._format_formula_cell(cell)
+            
+            # **CORRECTION 3** : Calcul du risque pondéré avec XLOOKUP
+            risk_formula = f"""=IF(AND(F{row}<>"",G{row}<>"",H{row}<>""),
+XLOOKUP(F{row},Gravite,tbl_Gravite_ID)*
+XLOOKUP(G{row},Vraisemblance,tbl_Vraisemblance_ID)*
+XLOOKUP(H{row},Valeur_Metier,tbl_ValeurMetier_ID),"")"""
+            
+            cell = ws.cell(row=row, column=9, value=risk_formula)
+            self._format_formula_cell(cell)
+        
+        # Validations pour l'évaluation manuelle
+        validation_config = {
+            6: "Gravite",           # Gravité
+            7: "Vraisemblance",     # Vraisemblance
+            8: "Valeur_Metier"      # Valeur Métier
+        }
+        
+        for col, range_name in validation_config.items():
+            dv = DataValidation(type="list", formula1=f"={range_name}", allow_blank=True)
+            ws.add_data_validation(dv)
+            dv.add(f"{get_column_letter(col)}2:{get_column_letter(col)}1000")
+        
+        # Protection et formatage
+        self._apply_sheet_protection(ws)
+        ws.freeze_panes = "B2"
+
+    def _create_atelier4_operationnels(self) -> None:
+        """Crée l'Atelier 4 - Scénarios opérationnels avec calculs automatiques."""
+        ws = self.wb.create_sheet("Atelier4_Operationnels")
+        
+        # **CORRECTION 1** : En-têtes étendus avec mesures de sécurité
+        headers = [
+            "ID_OV", "Scénario_Stratégique", "Vecteur_Attaque", "Étapes_Opérationnelles",
+            "Contrôles_Existants", "Vraisemblance_Résiduelle", "Impact", "Mesure_Recommandée", 
+            "Efficacité_Mesure", "Vraisemblance_Finale", "Niveau_Risque"
+        ]
+        
+        # Créer les en-têtes
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col, value=header)
+            cell.font = self.header_font
+            cell.fill = self.header_fill
+            cell.alignment = Alignment(horizontal="center")
+        
+        # Validation ID_OV
+        dv = DataValidation(type="list", formula1="=OV_ID", allow_blank=True)
+        ws.add_data_validation(dv)
+        dv.add("A2:A1000")
+        
+        # **CORRECTION 3** : Formules XLOOKUP pour remplissage automatique
+        for row in range(2, 101):
+            # Scénario_Stratégique - formule XLOOKUP corrigée
+            cell = ws.cell(row=row, column=2, value=f"=IFERROR(XLOOKUP(A{row},tbl_OV_OV_ID,tbl_OV_Strategic_Scenario),\"\")")
+            self._format_formula_cell(cell)
+            
+            # Vecteur_Attaque
+            cell = ws.cell(row=row, column=3, value=f"=IFERROR(XLOOKUP(A{row},tbl_OV_OV_ID,tbl_OV_Attack_Vector),\"\")")
+            self._format_formula_cell(cell)
+            
+            # Étapes_Opérationnelles
+            cell = ws.cell(row=row, column=4, value=f"=IFERROR(XLOOKUP(A{row},tbl_OV_OV_ID,tbl_OV_Operational_Steps),\"\")")
+            self._format_formula_cell(cell)
+            
+            # **CORRECTION 1** : Libellé de la mesure recommandée
+            cell = ws.cell(row=row, column=8, value=f"=IFERROR(XLOOKUP(H{row},Measure_ID,tbl_Measure_Label),\"\")")
+            self._format_formula_cell(cell)
+            
+            # **CORRECTION 3** : Calcul de vraisemblance finale pondérée par efficacité mesure
+            vraisemblance_finale_formula = f"""=IF(AND(F{row}<>"",I{row}<>""),
+MAX(1,XLOOKUP(F{row},Vraisemblance,tbl_Vraisemblance_ID)-XLOOKUP(I{row},Gravite,tbl_Gravite_ID)+1),"")"""
+            
+            cell = ws.cell(row=row, column=10, value=vraisemblance_finale_formula)
+            self._format_formula_cell(cell)
+            
+            # **CORRECTION 3** : Calcul automatique du niveau de risque final
+            risk_formula = f"""=IF(AND(J{row}<>"",G{row}<>""),
+IF(AND(J{row}>=3,XLOOKUP(G{row},Gravite,tbl_Gravite_ID)>=3),"Critique",
+IF(OR(J{row}>=3,XLOOKUP(G{row},Gravite,tbl_Gravite_ID)>=3),"Élevé",
+IF(AND(J{row}>=2,XLOOKUP(G{row},Gravite,tbl_Gravite_ID)>=2),"Moyen","Faible"))),"")"""
+            
+            cell = ws.cell(row=row, column=11, value=risk_formula)
+            self._format_formula_cell(cell)
+        
+        # **CORRECTION 2** : Validations étendues pour toutes les colonnes
+        validation_config = {
+            6: "Vraisemblance",     # Vraisemblance résiduelle
+            7: "Gravite",           # Impact
+            8: "Measure_ID",        # Mesure recommandée
+            9: "Gravite"            # Efficacité mesure
+        }
+        
+        for col, range_name in validation_config.items():
+            dv = DataValidation(type="list", formula1=f"={range_name}", allow_blank=True)
+            ws.add_data_validation(dv)
+            dv.add(f"{get_column_letter(col)}2:{get_column_letter(col)}1000")
+        
+        # Protection et formatage
+        self._apply_sheet_protection(ws)
+        ws.freeze_panes = "B2"
+    
+    def _create_atelier5_traitement(self) -> None:
+        """Crée l'Atelier 5 - Traitement du risque avec plan d'action détaillé."""
+        ws = self.wb.create_sheet("Atelier5_Traitement")
+        
+        # En-têtes français selon EBIOS RM Atelier 5
+        headers = [
+            "ID_Risque", "Scénario_Lié", "Niveau_Initial", "Option_Traitement", 
+            "Mesure_Choisie", "Responsable", "Échéance", "Coût_Estimé", 
+            "Efficacité_Attendue", "Niveau_Résiduel", "Statut_Mise_en_Œuvre"
+        ]
+        
+        # Créer les en-têtes
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col, value=header)
+            cell.font = self.header_font
+            cell.fill = self.header_fill
+            cell.alignment = Alignment(horizontal="center")
+        
+        # Options de traitement selon EBIOS RM
+        options_traitement = ["Réduire", "Éviter", "Transférer", "Accepter"]
+        statuts = ["Planifiée", "En cours", "Terminée", "Reportée", "Annulée"]
+        
+        # Validations de données
+        validation_config = {
+            3: "Gravite",           # Niveau initial
+            4: options_traitement,  # Option traitement  
+            5: "Measure_ID",        # Mesure choisie
+            6: "Stakeholder_ID",    # Responsable
+            8: "Gravite",           # Coût estimé
+            9: "Gravite",           # Efficacité attendue
+            10: "Gravite",          # Niveau résiduel
+            11: statuts             # Statut
+        }
+        
+        for col, validation_source in validation_config.items():
+            if isinstance(validation_source, list):
+                dv = DataValidation(type="list", formula1=f'"{",".join(validation_source)}"', allow_blank=True)
+            else:
+                dv = DataValidation(type="list", formula1=f"={validation_source}", allow_blank=True)
+            ws.add_data_validation(dv)
+            dv.add(f"{get_column_letter(col)}2:{get_column_letter(col)}100")
+        
+        # Formules automatiques pour certaines colonnes
+        for row in range(2, 51):
+            # Libellé de la mesure choisie (colonne après Mesure_Choisie)
+            cell = ws.cell(row=row, column=12, value=f"=IFERROR(XLOOKUP(E{row},Measure_ID,tbl_Measure_Label),\"\")")
+            self._format_formula_cell(cell)
+        
+        # Appliquer la protection et le formatage
+        self._apply_sheet_protection(ws)
+        ws.freeze_panes = "B2"
+
+    def _create_atelier5_mesures(self) -> None:
+        """Crée l'Atelier 5 - Catalogue des mesures avec mapping ISO 27001 Annex A."""
+        ws = self.wb.create_sheet("Atelier5_Mesures")
+        
+        # En-têtes selon méthodo EBIOS RM avec extension ISO
+        headers = [
+            "Scenario_ID", "Measure_ID", "Libellé_Mesure", "Categorie", 
+            "Cout_Implementation", "Efficacite_pct", "AnnexA_Control", 
+            "Statut_Implementation", "Responsable", "Echeance", "Commentaires"
+        ]
+        
+        # Créer les en-têtes avec style
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col, value=header)
+            cell.font = self.header_font
+            cell.fill = self.header_fill
+            cell.alignment = Alignment(horizontal="center")
+        
+        # **INNOVATION** : Validations avec messages d'erreur personnalisés
+        scenario_dv = DataValidation(type="list", formula1="=Scenario_ID", allow_blank=True)
+        scenario_dv.error = "Veuillez choisir un scénario valide dans la liste déroulante"
+        scenario_dv.errorTitle = "Erreur de saisie - Scénario"
+        scenario_dv.prompt = "Sélectionnez un scénario stratégique dans la liste"
+        scenario_dv.promptTitle = "Guide de saisie"
+        ws.add_data_validation(scenario_dv)
+        scenario_dv.add("A2:A1000")
+        
+        measure_dv = DataValidation(type="list", formula1="=tbl_Measure_ID", allow_blank=True)
+        measure_dv.error = "Cette mesure n'existe pas dans le catalogue ISO 27001"
+        measure_dv.errorTitle = "Erreur - Mesure inconnue"
+        measure_dv.prompt = "Choisissez une mesure du catalogue ISO 27001 Annex A"
+        measure_dv.promptTitle = "Sélection mesure de sécurité"
+        ws.add_data_validation(measure_dv)
+        measure_dv.add("B2:B1000")
+        
+        statut_dv = DataValidation(type="list", formula1='"Planifiée,En cours,Implémentée,Non applicable,Reportée"', allow_blank=True)
+        statut_dv.error = "Statut non reconnu. Utilisez : Planifiée, En cours, Implémentée, Non applicable ou Reportée"
+        statut_dv.errorTitle = "Statut invalide"
+        statut_dv.prompt = "Indiquez l'état d'avancement de la mesure"
+        ws.add_data_validation(statut_dv)
+        statut_dv.add("H2:H1000")
+        
+        # **INNOVATION** : Formules XLOOKUP pour remplissage automatique des métadonnées
+        for row in range(2, 201):
+            # Libellé automatique depuis catalogue
+            cell = ws.cell(row=row, column=3, value=f"=IFERROR(XLOOKUP(B{row},tbl_Measure_ID,tbl_Measure_Label),\"\")")
+            self._format_formula_cell(cell)
+            
+            # Catégorie automatique
+            cell = ws.cell(row=row, column=4, value=f"=IFERROR(XLOOKUP(B{row},tbl_Measure_ID,tbl_Measure_Category),\"\")")
+            self._format_formula_cell(cell)
+            
+            # Coût d'implémentation
+            cell = ws.cell(row=row, column=5, value=f"=IFERROR(XLOOKUP(B{row},tbl_Measure_ID,tbl_Measure_Cout),\"\")")
+            self._format_formula_cell(cell)
+            
+            # Efficacité par défaut
+            cell = ws.cell(row=row, column=6, value=f"=IFERROR(XLOOKUP(B{row},tbl_Measure_ID,tbl_Measure_Efficacite),\"\")")
+            self._format_formula_cell(cell)
+            
+            # Contrôle Annex A
+            cell = ws.cell(row=row, column=7, value=f"=IFERROR(XLOOKUP(B{row},tbl_Measure_ID,tbl_Measure_AnnexA),\"\")")
+            self._format_formula_cell(cell)
+        
+        # Protection et formatage
+        self._apply_sheet_protection(ws)
+        ws.freeze_panes = "B2"
+
+    def _create_heatmap_visualization(self) -> None:
+        """Crée l'onglet Heat-map avec matrice de risque visuelle."""
+        ws = self.wb.create_sheet("HeatMap_Risques")
+        
+        # Titre principal
+        ws.merge_cells("A1:J1")
+        title = ws["A1"]
+        title.value = "🔥 MATRICE DE CHALEUR - CARTOGRAPHIE DES RISQUES"
+        title.font = Font(size=16, bold=True, color="FFFFFF")
+        title.fill = PatternFill(start_color="C0392B", end_color="C0392B", fill_type="solid")
+        title.alignment = Alignment(horizontal="center", vertical="center")
+        
+        # **INNOVATION** : Matrice 4×4 avec mise en forme conditionnelle
+        # Headers Vraisemblance (colonnes)
+        likelihood_labels = ["", "Minimal", "Significatif", "Élevé", "Maximal"]
+        for col, label in enumerate(likelihood_labels, 2):
+            cell = ws.cell(row=3, column=col, value=label)
+            cell.font = Font(bold=True, color="FFFFFF")
+            cell.fill = PatternFill(start_color="2C3E50", end_color="2C3E50", fill_type="solid")
+            cell.alignment = Alignment(horizontal="center")
+        
+        # Headers Gravité (lignes) 
+        gravity_labels = ["Négligeable", "Limité", "Important", "Critique"]
+        risk_matrix_values = [
+            [1, 2, 3, 4],      # Négligeable
+            [2, 4, 6, 8],      # Limité  
+            [3, 6, 9, 12],     # Important
+            [4, 8, 12, 16]     # Critique
+        ]
+        
+        risk_colors = {
+            (1, 2, 3): "27AE60",     # Vert - Faible
+            (4, 6): "F39C12",        # Orange - Moyen  
+            (8, 9): "E74C3C",        # Rouge - Élevé
+            (12, 16): "C0392B"       # Rouge foncé - Critique
+        }
+        
+        for row_idx, (gravity_label, risk_row) in enumerate(zip(gravity_labels, risk_matrix_values), 4):
+            # Label gravité
+            gravity_cell = ws.cell(row=row_idx, column=1, value=gravity_label)
+            gravity_cell.font = Font(bold=True, color="FFFFFF")
+            gravity_cell.fill = PatternFill(start_color="2C3E50", end_color="2C3E50", fill_type="solid")
+            gravity_cell.alignment = Alignment(horizontal="center")
+            
+            # Valeurs de risque avec couleurs
+            for col_idx, risk_value in enumerate(risk_row, 2):
+                risk_cell = ws.cell(row=row_idx, column=col_idx, value=risk_value)
+                risk_cell.alignment = Alignment(horizontal="center", vertical="center")
+                risk_cell.font = Font(bold=True, size=14, color="FFFFFF")
+                
+                # Appliquer couleur selon valeur
+                for values, color in risk_colors.items():
+                    if risk_value in values:
+                        risk_cell.fill = PatternFill(start_color=color, end_color=color, fill_type="solid")
+                        break
+        
+        # **INNOVATION** : Tableau de répartition dynamique des scénarios
+        ws["A10"] = "📊 RÉPARTITION DES SCÉNARIOS PAR ZONE DE RISQUE"
+        ws["A10"].font = Font(size=12, bold=True)
+        
+        distribution_headers = ["Zone de Risque", "Nombre Scénarios", "% Total", "Actions Recommandées"]
+        for col, header in enumerate(distribution_headers, 1):
+            cell = ws.cell(row=11, column=col, value=header)
+            cell.font = Font(bold=True)
+            cell.fill = PatternFill(start_color="BDC3C7", end_color="BDC3C7", fill_type="solid")
+        
+        zones_risk = [
+            ("🟢 Acceptable (1-3)", '=COUNTIFS(Atelier4_Operationnels[Risque_Residuel],">=1",Atelier4_Operationnels[Risque_Residuel],"<=3")', "Surveillance"),
+            ("🟡 Tolérable (4-6)", '=COUNTIFS(Atelier4_Operationnels[Risque_Residuel],">=4",Atelier4_Operationnels[Risque_Residuel],"<=6")', "Mesures ciblées"),
+            ("🟠 Inacceptable (8-9)", '=COUNTIFS(Atelier4_Operationnels[Risque_Residuel],">=8",Atelier4_Operationnels[Risque_Residuel],"<=9")', "Plan d'action immédiat"),
+            ("🔴 Critique (12-16)", '=COUNTIFS(Atelier4_Operationnels[Risque_Residuel],">=12",Atelier4_Operationnels[Risque_Residuel],"<=16")', "Traitement d'urgence")
+        ]
+        
+        for row_idx, (zone, formula, action) in enumerate(zones_risk, 12):
+            ws.cell(row=row_idx, column=1, value=zone)
+            ws.cell(row=row_idx, column=2, value=formula)
+            ws.cell(row=row_idx, column=3, value=f'=IF(SUM(B12:B15)>0,B{row_idx}/SUM(B12:B15)*100,0)&"%"')
+            ws.cell(row=row_idx, column=4, value=action)
+
+    def _create_kpi_dashboard(self) -> None:
+        """Crée l'onglet KPI avec indicateurs Velocity et Preparedness."""
+        ws = self.wb.create_sheet("KPI_Dashboard")
+        
+        # Titre dashboard
+        ws.merge_cells("A1:H1")
+        title = ws["A1"]
+        title.value = "📈 TABLEAU DE BORD - INDICATEURS EBIOS RM"
+        title.font = Font(size=16, bold=True, color="FFFFFF")
+        title.fill = PatternFill(start_color="8E44AD", end_color="8E44AD", fill_type="solid")
+        title.alignment = Alignment(horizontal="center")
+        
+        # **SECTION VELOCITY** : Rapidité de détection et réponse
+        ws["A3"] = "⚡ VELOCITY - Rapidité d'intervention"
+        ws["A3"].font = Font(size=14, bold=True, color="2C3E50")
+        
+        velocity_headers = ["Indicateur", "Valeur Actuelle", "Cible", "Statut", "Tendance"]
+        for col, header in enumerate(velocity_headers, 1):
+            cell = ws.cell(row=4, column=col, value=header)
+            cell.font = Font(bold=True, color="FFFFFF")
+            cell.fill = PatternFill(start_color="3498DB", end_color="3498DB", fill_type="solid")
+        
+        velocity_kpis = [
+            ("Temps détection incident (h)", "=AVERAGE(Incidents[Temps_Detection])", "24", '=IF(B5<=C5,"✅ Conforme","⚠️ À améliorer")'),
+            ("Temps réponse incident (h)", "=AVERAGE(Incidents[Temps_Reponse])", "4", '=IF(B6<=C6,"✅ Conforme","❌ Non conforme")'),
+            ("% incidents résolus < 72h", "=COUNTIFS(Incidents[Temps_Resolution],'<72')/COUNT(Incidents[ID])*100", "90", '=IF(B7>=C7,"✅ Conforme","⚠️ À améliorer")')
+        ]
+        
+        for row_idx, (kpi_name, formula, target, status_formula) in enumerate(velocity_kpis, 5):
+            ws.cell(row=row_idx, column=1, value=kpi_name)
+            ws.cell(row=row_idx, column=2, value=formula)
+            ws.cell(row=row_idx, column=3, value=target)
+            ws.cell(row=row_idx, column=4, value=status_formula)
+            ws.cell(row=row_idx, column=5, value="📊")  # Placeholder pour graphique sparkline
+        
+        # **SECTION PREPAREDNESS** : Niveau de préparation
+        ws["A10"] = "🛡️ PREPAREDNESS - Niveau de préparation"
+        ws["A10"].font = Font(size=14, bold=True, color="2C3E50")
+        
+        for col, header in enumerate(velocity_headers, 1):
+            cell = ws.cell(row=11, column=col, value=header)
+            cell.font = Font(bold=True, color="FFFFFF")
+            cell.fill = PatternFill(start_color="27AE60", end_color="27AE60", fill_type="solid")
+        
+        preparedness_kpis = [
+            ("% actifs couverts mesures", "=COUNTIFS(Atelier1_Socle[Score_Risque],'>0')/COUNT(Atelier1_Socle[ID_Actif])*100", "95", '=IF(B12>=C12,"✅ Conforme","⚠️ Exposition")'),
+            ("% personnel formé SSI", "=COUNTIFS(Personnel[Formation_SSI],'Oui')/COUNT(Personnel[ID])*100", "90", '=IF(B13>=C13,"✅ Conforme","❌ Formation requise")'),
+            ("Maturité globale (1-5)", "=AVERAGE(Maturite[Score_Domaine])", "3", '=IF(B14>=C14,"✅ Mature","⚠️ Amélioration")'),
+            ("% mesures implémentées", "=COUNTIFS(Atelier5_Mesures[Statut_Implementation],'Implémentée')/COUNT(Atelier5_Mesures[Measure_ID])*100", "80", '=IF(B15>=C15,"✅ Conforme","❌ Retard")')
+        ]
+        
+        for row_idx, (kpi_name, formula, target, status_formula) in enumerate(preparedness_kpis, 12):
+            ws.cell(row=row_idx, column=1, value=kpi_name)
+            ws.cell(row=row_idx, column=2, value=formula)
+            ws.cell(row=row_idx, column=3, value=target)
+            ws.cell(row=row_idx, column=4, value=status_formula)
+            ws.cell(row=row_idx, column=5, value="📈")
+        
+        # **SECTION SYNTHÈSE** : Vue globale
+        ws["A18"] = "🎯 SYNTHÈSE GLOBALE"
+        ws["A18"].font = Font(size=14, bold=True, color="2C3E50")
+        
+        synthesis_formulas = [
+            ("Score Global Velocity", "=AVERAGE(B5:B7)"),
+            ("Score Global Preparedness", "=AVERAGE(B12:B15)"),
+            ("Index Maturité EBIOS", "=(F19+F20)/2"),
+            ("Recommandation Prioritaire", '=IF(F21<2.5,"Formation & Outils","Optimisation Continue")')
+        ]
+        
+        for row_idx, (metric, formula) in enumerate(synthesis_formulas, 19):
+            ws.cell(row=row_idx, column=1, value=metric).font = Font(bold=True)
+            ws.cell(row=row_idx, column=2, value=formula)
+
+    def _create_synthese(self) -> None:
+        """Crée l'onglet Synthèse avec indicateurs clés."""
+        ws = self.wb.create_sheet("Synthese")
+        
+        # Titre
+        ws["A1"] = "📊 SYNTHÈSE EXÉCUTIVE - ANALYSE DES RISQUES"
+        ws["A1"].font = Font(size=14, bold=True, color="FFFFFF")
+        ws["A1"].fill = PatternFill(start_color="34495E", end_color="34495E", fill_type="solid")
+        ws.merge_cells("A1:F1")
+        
+        # Métriques principales
+        ws["A3"] = "🎯 INDICATEURS CLÉS"
+        ws["A3"].font = Font(size=12, bold=True)
+        
+        # En-têtes
+        headers = ["Indicateur", "Valeur", "Statut", "Tendance"]
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=4, column=col, value=header)
+            cell.font = Font(bold=True)
+            cell.fill = self.gray_fill
+        
+        # Données de synthèse
+        metrics = [
+            ["Nombre d'actifs analysés", "=COUNTA(Atelier1_Socle.A:A)-1", "En cours", "↗️"],
+            ["Sources de risque identifiées", "=COUNTA(Atelier2_Sources.A:A)-1", "Complété", "→"],
+            ["Scénarios évalués", "=COUNTA(Atelier3_Scenarios.A:A)-1", "En cours", "↗️"],
+            ["Mesures planifiées", "=COUNTA(Atelier4_Operationnels.A:A)-1", "Planifié", "↗️"]
+        ]
+        
+        for row_idx, metric_data in enumerate(metrics, 5):
+            for col_idx, value in enumerate(metric_data, 1):
+                ws.cell(row=row_idx, column=col_idx, value=value)
+        
+        logger.info("✅ Onglet de synthèse créé")
+
+    def _format_formula_cell(self, cell) -> None:
+        """Formate une cellule contenant une formule (grise + verrouillée)."""
+        # Vérifier que la cellule contient bien une formule
+        if cell.value and isinstance(cell.value, str) and cell.value.startswith('='):
+            cell.fill = self.gray_fill
+            cell.protection = Protection(locked=True)
+    
+    def _apply_sheet_protection(self, ws) -> None:
+        """Applique la protection intelligente basée sur les formules."""
+        # Déverrouiller toutes les cellules par défaut
+        for row in ws.iter_rows():
+            for cell in row:
+                cell.protection = Protection(locked=False)
+        
+        # Verrouiller automatiquement les cellules contenant des formules
+        for row in ws.iter_rows():
+            for cell in row:
+                if cell.value and isinstance(cell.value, str) and cell.value.startswith('='):
+                    cell.protection = Protection(locked=True)
+                    # Appliquer le fond gris seulement sur les formules
+                    if not (cell.fill and cell.fill.start_color.rgb in ["D9D9D9", "00D9D9D9"]):
+                        cell.fill = self.gray_fill
+        
+        # Activer la protection de la feuille (sans mot de passe pour faciliter les tests)
+        ws.protection = SheetProtection(sheet=True, password=None)
+
+def main():
+    """Point d'entrée principal pour la génération du template EBIOS RM."""
+    # Configuration du logging pour avoir des messages visibles
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.StreamHandler(),  # Affichage console
+        ]
+    )
+    
+    print("🚀 Démarrage du générateur EBIOS RM...")
+    print("=" * 60)
+    
+    # Initialiser le générateur
+    print("🔧 Initialisation du générateur...")
+    generator = EBIOSTemplateGenerator()
+    
+    # Définir le chemin de sortie
+    output_path = Path("c:/Users/mushm/Documents/AR/templates/ebios_risk_assessment_FR.xlsx")
+    
+    print(f"📁 Création du répertoire de sortie...")
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    
+    print(f"📊 Génération du template EBIOS RM...")
+    print(f"   Destination: {output_path}")
+    
+    try:
+        # Générer le template complet
+        generator.generate_template(output_path)
+        
+        print("\n" + "=" * 60)
+        print("✅ SUCCÈS : Template EBIOS RM généré avec succès!")
+        print("=" * 60)
+        print(f"📁 Fichier créé : {output_path}")
+        print(f"📊 Taille du fichier : {output_path.stat().st_size / 1024:.1f} KB")
+        
+        # Vérifier la structure créée
+        try:
+            from openpyxl import load_workbook
+            wb = load_workbook(output_path)
+            sheet_names = wb.sheetnames
+            print(f"📋 Onglets créés ({len(sheet_names)}) :")
+            for i, sheet in enumerate(sheet_names, 1):
+                print(f"   {i}. {sheet}")
+            wb.close()
+        except Exception as e:
+            print(f"⚠️  Impossible de vérifier la structure : {e}")
+        
+        print("\n🎯 Le template est prêt pour utilisation!")
+        print("   Vous pouvez maintenant exécuter 'python visualize_template.py'")
+        
+    except Exception as e:
+        print("\n" + "=" * 60)
+        print("❌ ERREUR lors de la génération du template")
+        print("=" * 60)
+        print(f"💥 Erreur : {e}")
+        logging.exception("Erreur détaillée")
+        print("\n💡 Suggestions de résolution :")
+        print("   • Vérifiez que vous avez les droits d'écriture")
+        print("   • Fermez Excel s'il est ouvert")
+        print("   • Vérifiez l'espace disque disponible")
+        return False
+    
+    return True
+
+if __name__ == "__main__":
+    success = main()
+    if not success:
+        exit(1)

@@ -1,0 +1,319 @@
+{
+  "metadata": {
+    "generator": "EBIOSTemplateGenerator",
+    "version": "1.0",
+    "date": "2024-01-01"
+  },
+  "enumerations": {
+    "gravity_scale": [
+      "Négligeable",
+      "Limité",
+      "Important",
+      "Critique"
+    ],
+    "likelihood_scale": [
+      "Minimal",
+      "Significatif",
+      "Élevé",
+      "Maximal"
+    ],
+    "business_value_scale": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+    ],
+    "business_value_labels": [
+      "Niveau 1",
+      "Niveau 2",
+      "Niveau 3",
+      "Niveau 4",
+      "Niveau 5",
+      "Niveau 6",
+      "Niveau 7",
+      "Niveau 8",
+      "Niveau 9",
+      "Niveau 10",
+      "Niveau 11",
+      "Niveau 12",
+      "Niveau 13",
+      "Niveau 14",
+      "Niveau 15"
+    ],
+    "asset_type_catalog": [
+      "Serveur",
+      "Base de données",
+      "Application",
+      "Réseau",
+      "Poste de travail",
+      "Données",
+      "Personnel",
+      "Locaux",
+      "Processus"
+    ],
+    "stakeholder_catalog": [
+      "DSI",
+      "Direction",
+      "RSSI",
+      "DPO",
+      "Métier",
+      "Support",
+      "Externe",
+      "Fournisseur"
+    ],
+    "source_catalog": [
+      {
+        "Source_ID": "RS001",
+        "Label": "Cybercriminels organisés",
+        "Category": "Criminalité organisée",
+        "MotivationResources": "Gain financier - Outils avancés",
+        "Targeting": "Données sensibles et systèmes de paiement"
+      },
+      {
+        "Source_ID": "RS002",
+        "Label": "Acteurs étatiques",
+        "Category": "Espionnage d'État",
+        "MotivationResources": "Intelligence économique - Ressources illimitées",
+        "Targeting": "Informations stratégiques et propriété intellectuelle"
+      },
+      {
+        "Source_ID": "RS003",
+        "Label": "Employés malveillants",
+        "Category": "Menace interne",
+        "MotivationResources": "Vengeance ou gain personnel - Accès privilégié",
+        "Targeting": "Données confidentielles et systèmes internes"
+      },
+      {
+        "Source_ID": "RS004",
+        "Label": "Hacktivistes",
+        "Category": "Activisme numérique",
+        "MotivationResources": "Idéologie - Outils collaboratifs",
+        "Targeting": "Sites web et communication publique"
+      },
+      {
+        "Source_ID": "RS005",
+        "Label": "Prestataires compromis",
+        "Category": "Chaîne d'approvisionnement",
+        "MotivationResources": "Accès indirect - Privilèges étendus",
+        "Targeting": "Systèmes clients via relations de confiance"
+      }
+    ],
+    "scenario_catalog": [
+      {
+        "Scenario_ID": "SR001",
+        "Risk_Source": "RS001",
+        "Target_Objective": "Vol de données clients",
+        "Attack_Path": "Attaque externe ciblée",
+        "Motivation": "Revente de données personnelles"
+      },
+      {
+        "Scenario_ID": "SR002",
+        "Risk_Source": "RS003",
+        "Target_Objective": "Sabotage système",
+        "Attack_Path": "Abus de privilèges internes",
+        "Motivation": "Vengeance après licenciement"
+      },
+      {
+        "Scenario_ID": "SR003",
+        "Risk_Source": "RS002",
+        "Target_Objective": "Espionnage industriel",
+        "Attack_Path": "APT ciblée longue durée",
+        "Motivation": "Avantage concurrentiel étatique"
+      },
+      {
+        "Scenario_ID": "SR004",
+        "Risk_Source": "RS004",
+        "Target_Objective": "Défiguration site web",
+        "Attack_Path": "Attaque de surface publique",
+        "Motivation": "Message politique ou social"
+      }
+    ],
+    "operational_catalog": [
+      {
+        "OV_ID": "OV001",
+        "Strategic_Scenario": "SR001",
+        "Attack_Vector": "Phishing et ingénierie sociale",
+        "Operational_Steps": "Reconnaissance > Intrusion > Persistance > Exfiltration"
+      },
+      {
+        "OV_ID": "OV002",
+        "Strategic_Scenario": "SR002",
+        "Attack_Vector": "Accès physique et logique",
+        "Operational_Steps": "Planification > Exécution > Effacement traces"
+      },
+      {
+        "OV_ID": "OV003",
+        "Strategic_Scenario": "SR003",
+        "Attack_Vector": "Compromission chaîne logicielle",
+        "Operational_Steps": "Infiltration > Installation > C&C > Collecte > Exfiltration"
+      },
+      {
+        "OV_ID": "OV004",
+        "Strategic_Scenario": "SR004",
+        "Attack_Vector": "Exploitation vulnérabilités web",
+        "Operational_Steps": "Scan > Exploitation > Défiguration > Revendication"
+      }
+    ]
+  },
+  "schema": {
+    "atelier1_socle": {
+      "validations": {
+        "Type": {
+          "enum": [
+            "Serveur",
+            "Base de données",
+            "Application",
+            "Réseau",
+            "Poste de travail",
+            "Données",
+            "Personnel",
+            "Locaux",
+            "Processus"
+          ]
+        },
+        "Gravité": {
+          "enum": [
+            "Négligeable",
+            "Limité",
+            "Important",
+            "Critique"
+          ]
+        },
+        "Confidentialité": {
+          "enum": [
+            "Négligeable",
+            "Limité",
+            "Important",
+            "Critique"
+          ]
+        },
+        "Intégrité": {
+          "enum": [
+            "Négligeable",
+            "Limité",
+            "Important",
+            "Critique"
+          ]
+        },
+        "Disponibilité": {
+          "enum": [
+            "Négligeable",
+            "Limité",
+            "Important",
+            "Critique"
+          ]
+        },
+        "Valeur_Métier": {
+          "enum": [
+            "Niveau 1",
+            "Niveau 2",
+            "Niveau 3",
+            "Niveau 4",
+            "Niveau 5",
+            "Niveau 6",
+            "Niveau 7",
+            "Niveau 8",
+            "Niveau 9",
+            "Niveau 10",
+            "Niveau 11",
+            "Niveau 12",
+            "Niveau 13",
+            "Niveau 14",
+            "Niveau 15"
+          ]
+        },
+        "Propriétaire": {
+          "enum": [
+            "DSI",
+            "Direction",
+            "RSSI",
+            "DPO",
+            "Métier",
+            "Support",
+            "Externe",
+            "Fournisseur"
+          ]
+        }
+      }
+    },
+    "atelier2_sources": {
+      "validations": {
+        "Source_ID": {
+          "enum": [
+            "RS001",
+            "RS002",
+            "RS003",
+            "RS004",
+            "RS005"
+          ]
+        },
+        "Pertinence": {
+          "enum": [
+            "Négligeable",
+            "Limité",
+            "Important",
+            "Critique"
+          ]
+        },
+        "Exposition": {
+          "enum": [
+            "Négligeable",
+            "Limité",
+            "Important",
+            "Critique"
+          ]
+        }
+      }
+    },
+    "atelier3_scenarios": {
+      "validations": {
+        "Gravité": {
+          "enum": [
+            "Négligeable",
+            "Limité",
+            "Important",
+            "Critique"
+          ]
+        },
+        "Vraisemblance": {
+          "enum": [
+            "Minimal",
+            "Significatif",
+            "Élevé",
+            "Maximal"
+          ]
+        },
+        "Valeur_Métier": {
+          "enum": [
+            "Niveau 1",
+            "Niveau 2",
+            "Niveau 3",
+            "Niveau 4",
+            "Niveau 5",
+            "Niveau 6",
+            "Niveau 7",
+            "Niveau 8",
+            "Niveau 9",
+            "Niveau 10",
+            "Niveau 11",
+            "Niveau 12",
+            "Niveau 13",
+            "Niveau 14",
+            "Niveau 15"
+          ]
+        }
+      }
+    }
+  }
+}

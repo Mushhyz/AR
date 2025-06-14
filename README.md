@@ -213,6 +213,13 @@ $env:PATH += ";C:\Users\<username>\AppData\Roaming\Python\Python313\Scripts"
 python -m ebiosrm_core.cli validate
 ```
 
+### Erreurs Excel (formules supprimées)
+Si des formules sont corrompues au sein du fichier .xlsx, Excel peut les supprimer automatiquement. 
+Pour restaurer ou diagnostiquer ces formules :
+1. Ouvrez le fichier dans Excel (mode protégé).
+2. Suivez les indications de réparation.
+3. Exportez à nouveau avec la commande `ebiosrm export`.
+
 ## 🏗️ Architecture
 
 - **models.py**: Modèles Pydantic (Asset, Threat, Settings)

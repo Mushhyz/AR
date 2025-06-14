@@ -10,10 +10,24 @@ from typing_extensions import Annotated
 
 from . import generator, loader
 
+# Console setup - Rich preferred, fallback to typer
+try:
+    from rich.console import Console
+
+    console = Console()
+except ImportError:
+    # Fallback to typer.echo for console operations
+    class SimpleConsole:
+        def print(self, message, **kwargs):
+            typer.echo(message)
+
+    console = SimpleConsole()
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
+logger = logging.getLogger(__name__)
 
 app = typer.Typer(
     name="ebiosrm",
@@ -85,7 +99,7 @@ def export(
                 output_filename = f"{output_file}.md"
             else:
                 output_filename = f"{output_file}.{fmt.lower()}"
-
+        console.print(f"output_filename: {output_filename}")
         generator.run(
             cfg_dir=cfg,
             out_dir=out,
@@ -166,6 +180,46 @@ def version() -> None:
     from . import __version__
 
     typer.echo(f"EBIOS RM Generator v{__version__}")
+
+
+@app.command()
+def template(
+    output: Path = typer.Option(
+        Path("templates/"),
+        "--output",
+        "-o",
+        help="Output directory for template files",
+    ),
+    pme_profile: bool = typer.Option(
+        False, "--pme", help="Generate PME-specific template"
+    ),
+):
+    """Generate EBIOS RM Excel template."""
+    try:
+        # Fix import path to use scripts module
+        from scripts.generate_template import EBIOSTemplateGenerator
+
+        output.mkdir(parents=True, exist_ok=True)
+        template_file = output / "ebiosrm_template.xlsx"
+
+        typer.echo(f"🔧 Generating EBIOS RM template...")
+        typer.echo(f"   Output: {template_file}")
+        typer.echo(f"   Profile: {'PME' if pme_profile else 'Standard'}")
+
+        generator = EBIOSTemplateGenerator()
+        generator.generate_template(template_file, pme_profile=pme_profile)
+
+        typer.echo("✅ Template generated successfully!")
+        typer.echo(f"   File: {template_file}")
+
+    except ImportError as e:
+        typer.echo(f"❌ Template generator not available: {e}")
+        typer.echo("   Make sure the 'scripts' module is available")
+        raise typer.Exit(1)
+    except Exception as e:
+        typer.echo(f"❌ Template generation failed: {e}")
+        logger.error(f"Template generation error: {e}")
+        raise typer.Exit(1)
 
 
 if __name__ == "__main__":

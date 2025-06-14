@@ -1,0 +1,258 @@
+name: EBIOS Template Validation
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'scripts/**'
+      - 'tests/test_template_validation.py'
+      - 'ebiosrm_core/**'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'scripts/**'  
+      - 'tests/test_template_validation.py'
+      - 'ebiosrm_core/**'
+
+jobs:
+  pytest-validation:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.12']
+        
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e ".[dev]"
+        pip install openpyxl pandas pytest pytest-cov jsonschema
+    
+    - name: Create directories
+      run: |
+        mkdir -p templates
+        mkdir -p config
+        mkdir -p build
+    
+    - name: Generate EBIOS template
+      run: |
+        python scripts/generate_template.py
+        echo "✅ Template Excel généré"
+    
+    - name: Sync JSON schema with enum validation
+      run: |
+        python scripts/sync_json_excel.py templates/ebios_risk_assessment_FR.xlsx config/ebios_schema.json
+        echo "✅ Schéma JSON avec énumérations synchronisé"
+    
+    - name: Run comprehensive validation tests
+      run: |
+        pytest tests/test_template_validation.py::TestDataValidation::test_validation_list_errors -v
+        pytest tests/test_template_validation.py::TestDataValidation::test_locked_cells_protection -v  
+        pytest tests/test_template_validation.py::TestDataValidation::test_json_parity_validation -v
+        pytest tests/test_template_validation.py -v --cov=scripts --cov-report=term-missing
+        echo "✅ Tests de validation robustes passés"
+    
+    - name: Validate JSON-Schema compliance
+      run: |
+        python -c "
+        import json
+        import jsonschema
+        from pathlib import Path
+        
+        # Valider que le schéma généré est conforme JSON-Schema
+        with open('config/ebios_schema.json', 'r', encoding='utf-8') as f:
+            schema = json.load(f)
+        
+        # Vérifier structure JSON-Schema
+        assert '\$schema' in schema, 'Champ \$schema manquant'
+        assert '\$defs' in schema, 'Définitions \$defs manquantes'
+        assert 'enumerations' in schema['\$defs'], 'Section énumérations manquante'
+        
+        # Vérifier énumérations avec structure enum
+        enums = schema['\$defs']['enumerations']
+        for enum_name, enum_def in enums.items():
+            assert 'enum' in enum_def, f'Structure enum manquante pour {enum_name}'
+            assert isinstance(enum_def['enum'], list), f'Enum {enum_name} doit être une liste'
+            assert len(enum_def['enum']) > 0, f'Enum {enum_name} ne doit pas être vide'
+        
+        print('✅ Conformité JSON-Schema validée')
+        print(f'   - Énumérations: {len(enums)} ✓')
+        for name, defn in enums.items():
+            print(f'   - {name}: {len(defn[\"enum\"])} valeurs ✓')
+        "
+    
+    - name: Validate Excel ↔ JSON consistency
+      run: |
+        python -c "
+        from scripts.sync_json_excel import JSONExcelSyncer
+        from pathlib import Path
+        
+        syncer = JSONExcelSyncer(
+            Path('templates/ebios_risk_assessment_FR.xlsx'),
+            Path('config/ebios_schema.json')
+        )
+        
+        issues = syncer.validate_consistency()
+        
+        if issues['errors']:
+            print(f'❌ Erreurs de cohérence: {issues[\"errors\"]}')
+            exit(1)
+        
+        if issues['warnings']:
+            print(f'⚠️ Avertissements: {issues[\"warnings\"]}')
+        
+        print('✅ Cohérence Excel ↔ JSON garantie')
+        "
+    
+    - name: Upload template artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: ebios-risk-assessment-fr-py${{ matrix.python-version }}
+        path: |
+          templates/ebios_risk_assessment_FR.xlsx
+          config/ebios_schema.json
+        retention-days: 30
+    
+    - name: Generate build badge data
+      run: |
+        echo '{"schemaVersion": 1, "label": "EBIOS RM", "message": "build passing", "color": "brightgreen"}' > badge.json
+        echo "BUILD_STATUS=passing" >> $GITHUB_ENV
+    
+    - name: Upload badge data
+      uses: actions/upload-artifact@v3
+      with:
+        name: build-badge
+        path: badge.json
+        retention-days: 7
+
+  compliance-validation:
+    runs-on: ubuntu-latest
+    needs: pytest-validation
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.12'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e ".[dev]"
+        pip install openpyxl pandas jsonschema
+    
+    - name: Download artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: ebios-risk-assessment-fr-py3.12
+    
+    - name: EBIOS RM compliance validation
+      run: |
+        python -c "
+        import json
+        from pathlib import Path
+        from openpyxl import load_workbook
+        
+        # Vérifier conformité EBIOS RM avec énumérations
+        json_path = Path('config/ebios_schema.json')
+        excel_path = Path('templates/ebios_risk_assessment_FR.xlsx')
+        
+        # Charger et vérifier JSON avec structure enum
+        with open(json_path, 'r', encoding='utf-8') as f:
+            schema = json.load(f)
+        
+        # Vérifications EBIOS RM spécifiques avec enum
+        enums = schema.get('\$defs', {}).get('enumerations', {})
+        
+        # Vérifier échelles conformes ANSSI (IDs numériques 1-4)
+        gravity = enums.get('gravity_scale', {}).get('enum', [])
+        likelihood = enums.get('likelihood_scale', {}).get('enum', [])
+        
+        assert len(gravity) == 4, f'Échelle gravité doit avoir 4 niveaux, trouvé {len(gravity)}'
+        assert len(likelihood) == 4, f'Échelle vraisemblance doit avoir 4 niveaux, trouvé {len(likelihood)}'
+        assert gravity == [1, 2, 3, 4], f'IDs gravité incorrects: {gravity}'
+        assert likelihood == [1, 2, 3, 4], f'IDs vraisemblance incorrects: {likelihood}'
+        
+        # Vérifier catalogues source avec enum
+        sources = enums.get('source_catalog', {}).get('enum', [])
+        scenarios = enums.get('scenario_catalog', {}).get('enum', [])
+        
+        assert len(sources) >= 3, f'Catalogue sources doit avoir au moins 3 sources, trouvé {len(sources)}'
+        assert len(scenarios) >= 3, f'Catalogue scénarios doit avoir au moins 3 scénarios, trouvé {len(scenarios)}'
+        
+        # Vérifier structure Excel avec validations
+        wb = load_workbook(excel_path)
+        ateliers = ['Atelier1_Socle', 'Atelier2_Sources', 'Atelier3_Scenarios', 'Atelier4_Operationnels']
+        
+        for atelier in ateliers:
+            assert atelier in wb.sheetnames, f'Atelier {atelier} manquant'
+            ws = wb[atelier]
+            validations = ws.data_validations.dataValidation
+            assert len(validations) > 0, f'Aucune validation dans {atelier}'
+        
+        # Vérifier plages nommées principales
+        expected_ranges = ['Gravite', 'Vraisemblance', 'Source_ID', 'Scenario_ID', 'OV_ID']
+        for range_name in expected_ranges:
+            assert range_name in wb.defined_names, f'Plage nommée {range_name} manquante'
+        
+        wb.close()
+        
+        print('✅ Conformité EBIOS RM avec énumérations JSON-Schema validée')
+        print(f'   - Ateliers: {len(ateliers)} ✓')
+        print(f'   - Sources de risque: {len(sources)} ✓')
+        print(f'   - Scénarios: {len(scenarios)} ✓')
+        print(f'   - Échelles conformes ANSSI (1-4): ✓')
+        print(f'   - Plages nommées: {len(expected_ranges)} ✓')
+        print(f'   - Structure JSON-Schema avec enum: ✓')
+        "
+
+  release-artifacts:
+    runs-on: ubuntu-latest
+    needs: [pytest-validation, compliance-validation]
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Download all artifacts
+      uses: actions/download-artifact@v3
+    
+    - name: Create release package
+      run: |
+        mkdir -p release
+        cp ebios-risk-assessment-fr-py3.12/* release/
+        
+        # Créer README pour l'artefact
+        cat > release/README.md << 'EOF'
+        # EBIOS RM Template Package
+        
+        ![Build Status](https://img.shields.io/badge/EBIOS%20RM-build%20passing-brightgreen)
+        
+        ## Contenu
+        
+        - `ebios_risk_assessment_FR.xlsx` - Template Excel EBIOS RM avec validations
+        - `ebios_schema.json` - Schéma JSON-Schema avec énumérations
+        
+        ## Validation
+        
+        ✅ Conformité EBIOS RM ANSSI  
+        ✅ Tests de validation automatisés  
+        ✅ Cohérence Excel ↔ JSON garantie  
+        ✅ Structure JSON-Schema avec enum  
+        
+        Généré automatiquement via GitHub Actions.
+        EOF
+    
+    - name: Upload release artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: ebios-rm-release
+        path: release/
+        retention-days: 90

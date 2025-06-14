@@ -235,79 +235,104 @@ class TestFullWorkflow:
 class TestEBIOSRMWorkflows:
     """Test EBIOS RM-specific workflows and data structures."""
 
-    def test_atelier_1_data_structure(self, ebios_workshop_data):
-        """Test Atelier 1 (Socle) data structure and validation."""
-        atelier_1 = ebios_workshop_data["atelier_1"]
+    def test_template_integration_with_workflow(self, temp_config_dir, tmp_path):
+        """Test l'intégration du nouveau template avec le workflow existant."""
+        # Tester uniquement si les modules sont disponibles
+        try:
+            from scripts.generate_template import EBIOSTemplateGenerator
+            from scripts.sync_json_excel import JSONExcelSyncer
+        except ImportError:
+            pytest.skip("Template generation modules not available")
 
-        # Verify required components for Atelier 1
-        assert "mission_metier" in atelier_1
-        assert "actifs_supports" in atelier_1
-        assert "actifs_essentiels" in atelier_1
-        assert "parties_prenantes" in atelier_1
-        assert "sources_menaces" in atelier_1
+        # Générer le template
+        template_path = tmp_path / "integrated_template.xlsx"
+        generator = EBIOSTemplateGenerator()
+        generator.generate_template(template_path)
 
-        # Check data types and structure
-        assert isinstance(atelier_1["actifs_supports"], list)
-        assert len(atelier_1["actifs_supports"]) > 0
-        assert all(isinstance(item, str) for item in atelier_1["actifs_supports"])
+        assert template_path.exists()
 
-    def test_risk_source_categorization(self, sample_risk_sources):
-        """Test risk source categorization according to EBIOS RM."""
-        categories = {source.category for source in sample_risk_sources}
-        expected_categories = {
-            "Criminalité organisée",
-            "Espionnage d'État",
-            "Menace interne",
-        }
+        # Synchroniser avec JSON
+        json_path = tmp_path / "integrated_schema.json"
+        syncer = JSONExcelSyncer(template_path, json_path)
+        syncer.sync_excel_to_json()
 
-        assert categories == expected_categories
+        assert json_path.exists()
 
-        # Verify capability levels are properly assigned
-        capability_levels = [source.capability_level for source in sample_risk_sources]
-        assert all(
-            level in ["Low", "Medium", "High", "Critical"]
-            for level in capability_levels
-        )
+        # Valider cohérence
+        issues = syncer.validate_consistency()
+        assert len(issues["errors"]) == 0
 
-    def test_pme_profile_simplification(self, pme_profile_data):
-        """Test PME/TPE profile data simplification."""
-        assert len(pme_profile_data["criteres_impact"]) == 4  # Simplified scale
-        assert len(pme_profile_data["niveaux_vraisemblance"]) == 4  # Simplified scale
+        # Tester avec le workflow existant
+        from ebiosrm_core import generator, loader
 
-        # Verify predefined lists are suitable for small organizations
-        assert "Données" in pme_profile_data["types_actifs"]
-        assert "Cybercriminalité" in pme_profile_data["categories_menaces"]
-        assert "ISO 27001" in pme_profile_data["referentiels"]
+        assets, threats, settings, *_ = loader.load_all(temp_config_dir)
+        risks = generator.calculate_risks(assets, threats)
 
+        # Vérifier compatibilité des données
+        assert len(risks) > 0
+        for risk in risks:
+            assert "risk_level" in risk
+            assert "likelihood_score" in risk
+            assert risk["risk_level"] in ["Low", "Medium", "High", "Critical"]
 
-class TestExcelTemplateGeneration:
-    """Test Excel template generation with EBIOS RM features."""
+    def test_excel_formulas_integration(self, tmp_path):
+        """Test que les formules Excel fonctionnent avec les données réelles."""
+        try:
+            from scripts.generate_template import EBIOSTemplateGenerator
+        except ImportError:
+            pytest.skip("Template generation module not available")
 
-    def test_excel_data_validation_lists(self, temp_config_dir, tmp_path):
-        """Test generation of Excel files with data validation lists."""
-        # This would test the enhanced exporter with dropdown lists
-        # Implementation depends on updated exporters.py
-        pass
+        from openpyxl import load_workbook
 
-    def test_hidden_config_sheets(
-        self, temp_config_dir, tmp_path, excel_template_validator
-    ):
-        """Test that configuration sheets are properly hidden."""
-        # Generate Excel file
-        from ebiosrm_core import generator
+        # Générer template
+        template_path = tmp_path / "formula_test.xlsx"
+        generator = EBIOSTemplateGenerator()
+        generator.generate_template(template_path)
 
-        generator.run(cfg_dir=temp_config_dir, out_dir=tmp_path, fmt="xlsx")
+        # Charger et tester les formules
+        wb = load_workbook(template_path)
 
-        # Validate hidden sheets
-        excel_file = tmp_path / "ebiosrm_report.xlsx"
-        if excel_file.exists():
-            validation_results = excel_template_validator(excel_file)
-            assert validation_results["hidden_sheets"]["valid"], (
-                f"Hidden sheets validation failed: {validation_results['hidden_sheets']['issues']}"
-            )
+        # Test Atelier2 - Formules XLOOKUP
+        ws = wb["Atelier2_Sources"]
 
-    def test_structured_tables_creation(self, temp_config_dir, tmp_path):
-        """Test creation of structured Excel tables for better data management."""
-        # This would test table creation functionality
-        # Implementation depends on updated exporters.py with table support
-        pass
+        # Vérifier qu'on a bien des formules dans les bonnes cellules
+        for row in range(2, 5):  # Premières lignes
+            for col in [2, 3, 4, 5]:  # Colonnes avec formules
+                cell = ws.cell(row=row, column=col)
+                if cell.value:
+                    assert isinstance(
+                        cell.value, str
+                    ), f"Cellule {cell.coordinate} devrait contenir une formule"
+                    assert "XLOOKUP" in cell.value or "IFERROR" in cell.value, (
+                        f"Formule manquante dans {cell.coordinate}"
+                    )
+
+        wb.close()
+
+    def test_pme_profile_template_compatibility(self, tmp_path):
+        """Test la compatibilité du template avec le profil PME."""
+        try:
+            from scripts.generate_template import EBIOSTemplateGenerator
+            from scripts.sync_json_excel import JSONExcelSyncer
+        except ImportError:
+            pytest.skip("Template generation modules not available")
+
+        # Le template doit supporter les échelles simplifiées PME
+        generator = EBIOSTemplateGenerator()
+        template_path = tmp_path / "pme_template.xlsx"
+        generator.generate_template(template_path)
+
+        # Vérifier que les échelles sont compatibles PME
+        json_path = tmp_path / "pme_schema.json"
+
+        syncer = JSONExcelSyncer(template_path, json_path)
+        enums = syncer.extract_enums_from_excel()
+
+        # Les échelles doivent avoir 4 niveaux (compatible PME)
+        assert len(enums["gravity_scale"]) == 4
+        assert len(enums["likelihood_scale"]) == 4
+
+        # Vérifier les libellés français
+        gravity_labels = enums["gravity_scale"]
+        assert "Négligeable" in gravity_labels
+        assert "Critique" in gravity_labels

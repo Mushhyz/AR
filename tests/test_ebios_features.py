@@ -109,6 +109,26 @@ class TestOpenpyxlCompatibility:
         # Verify it was added
         assert len(ws.data_validations.dataValidation) > 0
 
+    def test_correct_defined_names_access(self):
+        """Test the correct way to access defined names in openpyxl."""
+        from openpyxl import Workbook
+        from openpyxl.workbook.defined_name import DefinedName
+
+        wb = Workbook()
+        
+        # Add some defined names
+        defn1 = DefinedName("TestRange1", attr_text="Sheet!$A$1:$A$10")
+        defn2 = DefinedName("TestRange2", attr_text="Sheet!$B$1:$B$10")
+        
+        wb.defined_names["TestRange1"] = defn1
+        wb.defined_names["TestRange2"] = defn2
+        
+        # Correct way to get defined names - use keys() directly on defined_names
+        found_ranges = list(wb.defined_names.keys())
+        assert "TestRange1" in found_ranges
+        assert "TestRange2" in found_ranges
+        assert len(found_ranges) >= 2
+
 
 class TestPydanticV2Migration:
     """Test Pydantic V2 compatibility."""
