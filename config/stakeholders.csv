@@ -1,0 +1,7 @@
+id,name,type,role,responsibilities,contact_info
+ST001,IT Security Team,Internal,Security Management,Risk assessment,security@company.com
+ST002,Data Protection Officer,Internal,Compliance,GDPR compliance,dpo@company.com
+ST003,Executive Management,Internal,Decision Making,Risk acceptance,exec@company.com
+ST004,Regulatory Authority,Regulatory,Oversight,Compliance monitoring,contact@regulator.gov
+ST005,Cloud Provider,External,Service Provider,Infrastructure security,support@cloudprovider.com
+ST006,Legal Department,Internal,Legal Compliance,Contract review,legal@company.com

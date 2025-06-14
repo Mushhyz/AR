@@ -1,0 +1,7 @@
+id,label,type,description,effectiveness,implementation_cost,target_threats,responsible_stakeholder
+M001,Multi-Factor Authentication,Preventive,Implement MFA for all user accounts,High,Medium,SR001,ST001
+M002,Network Segmentation,Preventive,Isolate critical systems from general network,High,High,SR001,ST001
+M003,Security Awareness Training,Preventive,Regular employee security training,Medium,Low,SR005,ST001
+M004,Incident Response Plan,Corrective,Formal incident response procedures,Medium,Low,SR001,ST001
+M005,Data Backup Strategy,Recovery,Regular automated backups with testing,High,Medium,SR006,ST001
+M006,Access Control Review,Detective,Quarterly access rights review,Medium,Low,SR002,ST001

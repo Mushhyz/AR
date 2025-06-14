@@ -1,0 +1,6 @@
+id,type,label,criticality
+A001,Data,Customer Database,Critical
+A002,System,Web Server,High
+A003,Data,Application Logs,Low
+A004,System,Database Server,Critical
+A005,Network,Internal Network,Medium

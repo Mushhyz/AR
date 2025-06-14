@@ -1,0 +1,7 @@
+id,label,category,motivation,capability_level,resources
+RS001,Cybercriminal Groups,External Criminal,Financial Gain,High,Advanced tools and infrastructure
+RS002,Nation State Actors,State Sponsored,Espionage,Critical,Government resources and expertise
+RS003,Malicious Insiders,Internal Threat,Personal Gain,Medium,Internal access and knowledge
+RS004,Hacktivists,External Activist,Ideological,Medium,Community support and skills
+RS005,Competitors,Commercial,Market Advantage,Medium,Corporate resources
+RS006,Disgruntled Employees,Internal Threat,Revenge,Low,Limited technical skills

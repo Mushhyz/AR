@@ -1,0 +1,7 @@
+sr_id,ov_id,strategic_path,operational_steps
+SR001,OV001,External Cyber Attack,Reconnaissance:Low,Initial Access:Medium,Persistence:High,Data Exfiltration:High
+SR002,OV002,Insider Threat,Access Granted:High,Data Collection:Medium,Data Theft:High
+SR003,OV003,Physical Intrusion,Building Access:Low,System Access:Medium,Data Access:High
+SR004,OV004,Supply Chain Attack,Vendor Compromise:Medium,Software Distribution:High,System Infection:Critical
+SR005,OV005,Social Engineering,Information Gathering:Medium,Contact Target:High,Credential Extraction:Critical
+SR006,OV006,Ransomware Attack,Initial Infection:Medium,Lateral Movement:High,Encryption:Critical

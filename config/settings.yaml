@@ -1,0 +1,4 @@
+excel_template: templates/ebiosrm_empty.xlsx
+severity_scale: [Low, Medium, High, Critical]
+likelihood_scale: [One-shot, Occasional, Probable, Systematic]
+output_dir: build/

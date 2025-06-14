@@ -1,0 +1,19 @@
+id,label,target_assets,business_impact,attack_scenarios
+OBJ001,Data Theft,A001,Critical,"SR001,SR002"
+OBJ002,Service Disruption,A002,High,SR006
+OBJ003,Financial Fraud,A003,Critical,"SR002,SR005"
+OBJ004,Infrastructure Damage,A004,High,"SR003,SR004"
+OBJ005,Intellectual Property Theft,A005,Medium,"SR001,SR004"
+OBJ006,System Compromise,A001,Critical,SR001
+OBJ007,Data Access,A002,High,SR001
+OBJ008,Internal Breach,A001,Critical,SR002
+OBJ009,Log Tampering,A003,Medium,SR002
+OBJ010,Physical Access,A002,High,SR003
+OBJ011,Server Compromise,A004,Critical,SR003
+OBJ012,Supply Chain Breach,A001,Critical,SR004
+OBJ013,Database Access,A004,High,SR004
+OBJ014,Social Engineering Attack,A001,Critical,SR005
+OBJ015,Credential Theft,A002,Medium,SR005
+OBJ016,Ransomware Deployment,A001,Critical,SR006
+OBJ017,System Encryption,A002,High,SR006
+OBJ018,Infrastructure Lock,A004,Critical,SR006
